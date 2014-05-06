@@ -19,7 +19,7 @@
 // onCompleted{"frameId":4,"processId":540,"tabId":440,"timeStamp":1398929956193.462,"url":"about:blank"} background.js:12
 // onCompleted{"frameId":4,"processId":540,"tabId":440,"timeStamp":1398929956193.634,"url":"about:blank"} background.js:12
 // onCompleted{"frameId":5,"processId":540,"tabId":440,"timeStamp":1398929957044.0012,"url":"http://ads.dynamicyield.com/abadimage/my-ad.html"} background.js:12
-// onCompleted{"frameId":0,"processId":540,"tabId":440,"timeStamp":1398929957047.105,"url":"http://www.nytimes.com/"} 
+// onCompleted{"frameId":0,"processId":540,"tabId":440,"timeStamp":1398929957047.105,"url":"http://www.nytimes.com/"}
 //
 // onBeforeNavigate{"frameId":0,"parentFrameId":-1,"processId":545,"tabId":442,"timeStamp":1398930514966.6719,"url":"https://www.google.co.uk/_/chrome/newtab?espv=210&ie=UTF-8"} background.js:8
 // onCompleted{"frameId":0,"processId":545,"tabId":442,"timeStamp":1398930515566.092,"url":"https://www.google.co.uk/_/chrome/newtab?espv=210&ie=UTF-8"} background.js:12
@@ -29,20 +29,26 @@
 // onCompleted{"frameId":0,"processId":546,"tabId":442,"timeStamp":1398930549596.515,"url":"https://vilimpoc.org/"} background.js:12
 //
 // So to track a new page load, we need to watch for:
-// 
+//
 //     onBeforeNavigate with -- (0 == frameId && -1 == parentFrameId) -- save the tabId and URL, because this is a new page load.
 //     onCompleted      with -- (0 == frameId)                        -- remove the tabId and URL from tracking, because this page load is done.
 //
-// onChanged{"cause":"explicit","cookie":{"domain":".nytimes.com","expirationDate":1430480382.545723,"hostOnly":false,"httpOnly":false,"name":"nyt-a","path":"/","secure":false,"session":false,"storeId":"0","value":"f61f999b26a346a24c6344bcd9d1e3e0"},"removed":false} 
+// onChanged{"cause":"explicit","cookie":{"domain":".nytimes.com","expirationDate":1430480382.545723,"hostOnly":false,"httpOnly":false,"name":"nyt-a","path":"/","secure":false,"session":false,"storeId":"0","value":"f61f999b26a346a24c6344bcd9d1e3e0"},"removed":false}
 //
 
+"use strict";
+
+/**
+ * Defined just for WebStorm to not keep asking.
+ */
+var chrome = chrome || {};
 
 /**
  * Tracking table for in-flight page loads.
  *
  * key -- "tabId-processId-frameId"
  */
-var inFlight;
+var inFlight = {};
 
 /**
  * These are the outermost navigation events, the parent frame
@@ -51,7 +57,7 @@ var inFlight;
  * key   -- "tabId-processId-frameId"
  * value -- { start: details object, end: details object }
  */
-var parentNavigationEvents;
+var parentNavigationEvents = [];
 
 // The schema of the JSON objects here is:
 //
@@ -60,33 +66,59 @@ var parentNavigationEvents;
 // loadStarted
 // loadEnded
 
-var navigationEvents;
+var navigationEvents = [];
 
 // The schema of the JSON objects here is:
 //
-// 
+//
 
-var cookieEvents;
+var cookieEvents = [];
 
 /**
- * A table where:
- *
- * key   -- "URL"
- * value -- [{start, stop}, {start, stop}] -- an array of start/stop loading timestamps (for later visualization).
+ * A big array of domains loaded.
  */
-var pagesLoaded;
+var domainsLoaded = [];
 
+
+var makeKey = function(tabId, processId, frameId) {
+    return tabId + "-" + processId + "-" + frameId;
+};
+
+var stampStart = function(details) {
+    var key      = makeKey(details.tabId, details.processId, details.frameId);
+    var hostname = new URL(details.url).hostname;
+
+    // Create an in-flight timestamp object, which waits for the frame to finish loading.
+    inFlight[key] = { hostname: hostname, url: details.url, start: new Date().getTime(), finish: 0 };
+
+    console.log(JSON.stringify(inFlight[key]));
+};
+
+var stampFinish = function(details) {
+    var key = makeKey(details.tabId, details.processId, details.frameId);
+
+    var stamp = inFlight[key];
+    stamp.finish = new Date().getTime();
+
+    console.log(JSON.stringify(stamp));
+};
 
 var onBeforeNavigateListener = function(details) {
     console.log("onBeforeNavigate" + JSON.stringify(details));
+
+    stampStart(details);
 };
 
 var onCompletedListener = function(details) {
     console.log("onCompleted" + JSON.stringify(details));
+
+    stampFinish(details);
 };
 
 var onErrorOccurred = function(details) {
     console.log("onErrorOccurred" + JSON.stringify(details));
+
+    stampFinish(details);
 };
 
 
