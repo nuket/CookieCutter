@@ -1,0 +1,22 @@
+{
+	"name" : "Cookie Monitor",
+	"version" : "0.1",
+	"description" : "A method for visualizing Cookies",
+	"permissions": [ 
+		"cookies",
+		"webNavigation",
+		"tabs", 
+		"http://*/*", 
+		"https://*/*" ],
+	"icons": { 
+		"16": "cookie.png", 
+		"48": "cookie.png", 
+		"128": "cookie.png" },
+	"browser_action": {
+		"default_icon": "cookie.png"
+	},
+	"background": {
+		"scripts": ["background.js"]
+	},
+	"manifest_version": 2
+}
