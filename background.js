@@ -40,9 +40,18 @@
 /**
  * Tracking table for in-flight page loads.
  *
- * key -- 
+ * key -- "tabId-processId-frameId"
  */
 var inFlight;
+
+/**
+ * These are the outermost navigation events, the parent frame
+ * events. We can use these to bracket subevents.
+ *
+ * key   -- "tabId-processId-frameId"
+ * value -- { start: details object, end: details object }
+ */
+var parentNavigationEvents;
 
 // The schema of the JSON objects here is:
 //
@@ -59,6 +68,27 @@ var navigationEvents;
 
 var cookieEvents;
 
+/**
+ * A table where:
+ *
+ * key   -- "URL"
+ * value -- [{start, stop}, {start, stop}] -- an array of start/stop loading timestamps (for later visualization).
+ */
+var pagesLoaded;
+
+
+var onBeforeNavigateListener = function(details) {
+    console.log("onBeforeNavigate" + JSON.stringify(details));
+};
+
+var onCompletedListener = function(details) {
+    console.log("onCompleted" + JSON.stringify(details));
+};
+
+var onErrorOccurred = function(details) {
+    console.log("onErrorOccurred" + JSON.stringify(details));
+};
+
 
 chrome.cookies.onChanged.addListener(function(details) {
     // Add a timestamp to the Details object (as it's not currently provided).
@@ -66,17 +96,9 @@ chrome.cookies.onChanged.addListener(function(details) {
     console.log("onChanged" + JSON.stringify(details));
 });
 
-chrome.webNavigation.onBeforeNavigate.addListener(function(details) {
-    console.log("onBeforeNavigate" + JSON.stringify(details));
-});
-
-chrome.webNavigation.onCompleted.addListener(function(details) {
-    console.log("onCompleted" + JSON.stringify(details));
-});
-
-chrome.webNavigation.onErrorOccurred.addListener(function(details) {
-    console.log("onCompleted" + JSON.stringify(details));
-});
+chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
+chrome.webNavigation.onCompleted.addListener(onCompletedListener);
+chrome.webNavigation.onErrorOccurred.addListener(onErrorOccurred);
 
 
 

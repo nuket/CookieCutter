@@ -1,10 +1,11 @@
 {
 	"name" : "Cookie Monitor",
 	"version" : "0.1",
-	"description" : "A method for visualizing Cookies",
+	"description" : "An extension to track and visualize the web cookies sent and received while web browsing.",
 	"permissions": [ 
 		"cookies",
 		"webNavigation",
+        "webRequest",
 		"tabs", 
 		"http://*/*", 
 		"https://*/*" ],
