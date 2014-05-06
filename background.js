@@ -28,6 +28,10 @@
 // onBeforeNavigate{"frameId":0,"parentFrameId":-1,"processId":546,"tabId":442,"timeStamp":1398930548675.8088,"url":"http://vilimpoc.org/"} background.js:8
 // onCompleted{"frameId":0,"processId":546,"tabId":442,"timeStamp":1398930549596.515,"url":"https://vilimpoc.org/"} background.js:12
 //
+// onBeforeNavigate{"frameId":12,"parentFrameId":0,"processId":235,"tabId":152,"timeStamp":1399393519299.13,"url":"about:blank"} background.js:121
+// onCommitted{"frameId":12,"processId":235,"tabId":152,"timeStamp":1399393519306.4329,"transitionQualifiers":[],"transitionType":"auto_subframe","url":"about:blank"} background.js:127
+// onCompleted{"frameId":12,"processId":235,"tabId":152,"timeStamp":1399393519307.112,"url":"about:blank"}
+//
 // So to track a new page load, we need to watch for:
 //
 //     onBeforeNavigate with -- (0 == frameId && -1 == parentFrameId) -- save the tabId and URL, because this is a new page load.
@@ -51,34 +55,19 @@ var chrome = chrome || {};
 var inFlight = {};
 
 /**
- * These are the outermost navigation events, the parent frame
- * events. We can use these to bracket subevents.
+ * A list of all page loads made during a session.
  *
- * key   -- "tabId-processId-frameId"
- * value -- { start: details object, end: details object }
+ * Objects within the list have the following properties for filtering:
+ *
+ * topFrame -- true or false depending on whether the load was of a top-level frame or a subframe.
  */
-var parentNavigationEvents = [];
-
-// The schema of the JSON objects here is:
-//
-// loadUrl
-// redirectUrl (if it was 302'd)
-// loadStarted
-// loadEnded
-
-var navigationEvents = [];
+var allPageLoads = [];
 
 // The schema of the JSON objects here is:
 //
 //
 
 var cookieEvents = [];
-
-/**
- * A big array of domains loaded.
- */
-var domainsLoaded = [];
-
 
 var makeKey = function(tabId, processId, frameId) {
     return tabId + "-" + processId + "-" + frameId;
@@ -87,9 +76,33 @@ var makeKey = function(tabId, processId, frameId) {
 var stampStart = function(details) {
     var key      = makeKey(details.tabId, details.processId, details.frameId);
     var hostname = new URL(details.url).hostname;
+    var topFrame = false;
+
+    var parentKey;
+
+    if ('about:blank' === details.url) return;
+
+    // We need to mark the navigation as user-started when it is using frameId 0.
+    //
+    // This also means it is /not/ a subframe.
+    //
+    // If it IS a subframe, then we should add it to the list of subStamps being
+    // tracked by the top frame.
+    if (0 == details.frameId) {
+        topFrame = true;
+    } else {
+        // Look for the parent-frame timestamp object, and add a reference to the
+        // .subStamps property.
+        //
+        // The parent-frame reference should remain valid in the in-flight table
+        // until all subframes have loaded anyway.
+        parentKey = makeKey(details.tabId, details.processId, 0);
+
+        // inFlight[key]
+    }
 
     // Create an in-flight timestamp object, which waits for the frame to finish loading.
-    inFlight[key] = { hostname: hostname, url: details.url, start: new Date().getTime(), finish: 0 };
+    inFlight[key] = { hostname: hostname, start: new Date().getTime(), finish: 0, topFrame: topFrame, url: details.url, subStamps: [] };
 
     console.log(JSON.stringify(inFlight[key]));
 };
@@ -97,14 +110,27 @@ var stampStart = function(details) {
 var stampFinish = function(details) {
     var key = makeKey(details.tabId, details.processId, details.frameId);
 
+    // Get the timestamp from the in-flight table, and set the finished-loading timestamp.
     var stamp = inFlight[key];
     stamp.finish = new Date().getTime();
+
+    // Save the page-load record to a more permanent log.
+    allPageLoads.push(stamp);
+
+    // Remove the page-load record from the in-flight table.
+    delete inFlight[key];
 
     console.log(JSON.stringify(stamp));
 };
 
-var onBeforeNavigateListener = function(details) {
-    console.log("onBeforeNavigate" + JSON.stringify(details));
+// var onBeforeNavigateListener = function(details) {
+//     console.log("onBeforeNavigate" + JSON.stringify(details));
+//
+//     stampStart(details);
+// };
+
+var onCommitted = function(details) {
+    console.log("onCommitted" + JSON.stringify(details));
 
     stampStart(details);
 };
@@ -128,7 +154,8 @@ chrome.cookies.onChanged.addListener(function(details) {
     console.log("onChanged" + JSON.stringify(details));
 });
 
-chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
+// chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
+chrome.webNavigation.onCommitted.addListener(onCommitted);
 chrome.webNavigation.onCompleted.addListener(onCompletedListener);
 chrome.webNavigation.onErrorOccurred.addListener(onErrorOccurred);
 
