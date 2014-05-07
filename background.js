@@ -1,3 +1,4 @@
+//
 // Copyright (c) 2014 Max Vilimpoc. All rights reserved.
 //
 // We need a variable to track page loads in progress and ignore onBeforeNavigate
@@ -48,6 +49,13 @@
 var chrome = chrome || {};
 
 /**
+ * Storage handle, for persisting timestamps.
+ *
+ * @type {chrome.storage|*}
+ */
+var storage = chrome.storage;
+
+/**
  * Tracking table for in-flight page loads.
  *
  * key -- "tabId-processId-frameId"
@@ -60,13 +68,33 @@ var inFlight = {};
  * Objects within the list have the following properties for filtering:
  *
  * topFrame -- true or false depending on whether the load was of a top-level frame or a subframe.
+ *
+ * @type {Array}
  */
 var allPageLoads = [];
 
-// The schema of the JSON objects here is:
-//
-//
+/**
+ * Use the event count to group the page-load actions together.
+ *
+ * In other words, even if a page load action is
+ * occurring due to a client_redirect / META refresh
+ * we need a way to say that all the actions between
+ * the onCommitted and onComplete/ErrorOccurred
+ * belong to one page load action.
+ *
+ * Example: nytimes.com website will META refresh
+ * every N seconds, so we want to make sure that
+ * all the actions are associated with a page load
+ * ID.
+ *
+ * @type {number}
+ */
+var eventCount = 0;
 
+/**
+ *
+ * @type {Array}
+ */
 var cookieEvents = [];
 
 var makeKey = function(tabId, processId, frameId) {
@@ -74,13 +102,16 @@ var makeKey = function(tabId, processId, frameId) {
 };
 
 var stampStart = function(details) {
-    var key      = makeKey(details.tabId, details.processId, details.frameId);
+    // Immediate check and return.
+    if ('about:blank' === details.url) return;
+
+    var key      = makeKey(details.tabId, details.processId, details.frameId);  //!< All frames and subframes have a unique identifier.
     var hostname = new URL(details.url).hostname;
     var topFrame = false;
+    var process  = makeKey(details.tabId, details.processId, 0);
+    var eventId  = -1;                                                          //!< All actions between the start and finish of the top-frame action count as the same event.
 
-    var parentKey;
-
-    if ('about:blank' === details.url) return;
+    var stamp;
 
     // We need to mark the navigation as user-started when it is using frameId 0.
     //
@@ -90,29 +121,46 @@ var stampStart = function(details) {
     // tracked by the top frame.
     if (0 == details.frameId) {
         topFrame = true;
+        eventId  = eventCount++;
     } else {
         // Look for the parent-frame timestamp object, and add a reference to the
         // .subStamps property.
         //
         // The parent-frame reference should remain valid in the in-flight table
         // until all subframes have loaded anyway.
-        parentKey = makeKey(details.tabId, details.processId, 0);
+        topFrame = false;
 
-        // inFlight[key]
+        // Look up the parent-frame timestamp and make sure that this subframe
+        // is associated with the same eventId.
+        if (process in inFlight) {
+            stamp = inFlight[process];
+            eventId = stamp.eventId;
+        } else {
+            // If a subframe load occurs after the parent-frame is no longer in-flight,
+            // then it needs its own separate event count.
+            eventId = eventCount++;
+        }
+
     }
 
     // Create an in-flight timestamp object, which waits for the frame to finish loading.
-    inFlight[key] = { hostname: hostname, start: new Date().getTime(), finish: 0, topFrame: topFrame, url: details.url, subStamps: [] };
+    inFlight[key] = { process: process, eventId: eventId, start: new Date().getTime(), finish: 0, topFrame: topFrame, hostname: hostname, url: details.url, subStamps: [] };
 
-    console.log(JSON.stringify(inFlight[key]));
+    console.log('key: ' + key + " = " + JSON.stringify(inFlight[key]));
 };
 
 var stampFinish = function(details) {
+    // Immediate check and return.
+    if ('about:blank' === details.url) return;
+
     var key = makeKey(details.tabId, details.processId, details.frameId);
+    var stamp;
 
     // Get the timestamp from the in-flight table, and set the finished-loading timestamp.
-    var stamp = inFlight[key];
-    stamp.finish = new Date().getTime();
+    if (key in inFlight) {
+        stamp = inFlight[key];
+        stamp.finish = new Date().getTime();
+    }
 
     // Save the page-load record to a more permanent log.
     allPageLoads.push(stamp);
@@ -120,7 +168,7 @@ var stampFinish = function(details) {
     // Remove the page-load record from the in-flight table.
     delete inFlight[key];
 
-    console.log(JSON.stringify(stamp));
+    console.log('key: ' + key + " = " + JSON.stringify(stamp));
 };
 
 // var onBeforeNavigateListener = function(details) {
@@ -148,11 +196,11 @@ var onErrorOccurred = function(details) {
 };
 
 
-chrome.cookies.onChanged.addListener(function(details) {
-    // Add a timestamp to the Details object (as it's not currently provided).
-    details['timestamp'] = new Date().getTime();
-    console.log("onChanged" + JSON.stringify(details));
-});
+//chrome.cookies.onChanged.addListener(function(details) {
+//    // Add a timestamp to the Details object (as it's not currently provided).
+//    details['timestamp'] = new Date().getTime();
+//    console.log("onChanged" + JSON.stringify(details));
+//});
 
 // chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
 chrome.webNavigation.onCommitted.addListener(onCommitted);

@@ -6,6 +6,7 @@
 		"cookies",
 		"webNavigation",
         "webRequest",
+        "storage",
 		"tabs", 
 		"http://*/*", 
 		"https://*/*" ],
