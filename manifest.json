@@ -1,26 +1,26 @@
 {
-	"name" : "Cookie Monitor",
-	"version" : "0.1",
-	"description" : "An extension to track and visualize the web cookies sent and received while web browsing.",
-	"permissions": [ 
-		"cookies",
-		"webNavigation",
+    "name" : "Cookie Monitor",
+    "version" : "0.1",
+    "description" : "An extension to track and visualize the web cookies sent and received while web browsing.",
+    "permissions": [
+        "cookies",
+        "webNavigation",
         "webRequest",
         "webRequestBlocking",
         "storage",
         // "unlimitedStorage",
-		"tabs", 
-		"http://*/*", 
-		"https://*/*" ],
-	"icons": { 
-		"16": "cookie.png", 
-		"48": "cookie.png", 
-		"128": "cookie.png" },
-	"browser_action": {
-		"default_icon": "cookie.png"
-	},
-	"background": {
-		"scripts": ["background.js"]
-	},
-	"manifest_version": 2
+        "tabs",
+        "http://*/*",
+        "https://*/*" ],
+    "icons": {
+        "16": "cookie.png",
+        "48": "cookie.png",
+        "128": "cookie.png" },
+    "browser_action": {
+        "default_icon": "cookie.png"
+    },
+    "background": {
+        "scripts": ["background.js"]
+    },
+    "manifest_version": 2
 }
