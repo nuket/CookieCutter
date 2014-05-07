@@ -89,7 +89,16 @@ var allPageLoads = [];
  *
  * @type {number}
  */
-var eventCount = 0;
+var pageLoadCount = 0;
+
+/**
+ * Database record ID, monotonically increasing.
+ *
+ * Each record needs one of these because localStorage is gimpy.
+ *
+ * @type {number}
+ */
+var storageId = 0;
 
 /**
  *
@@ -105,11 +114,14 @@ var stampStart = function(details) {
     // Immediate check and return.
     if ('about:blank' === details.url) return;
 
+    // TODO: Immediate check and return.
+    // if (tab is incognito) return;
+
     var key      = makeKey(details.tabId, details.processId, details.frameId);  //!< All frames and subframes have a unique identifier.
     var hostname = new URL(details.url).hostname;
     var topFrame = false;
     var process  = makeKey(details.tabId, details.processId, 0);
-    var eventId  = -1;                                                          //!< All actions between the start and finish of the top-frame action count as the same event.
+    var pageload = -1;                                                          //!< All actions between the start and finish of the top-frame action count as the same event.
 
     var stamp;
 
@@ -121,7 +133,7 @@ var stampStart = function(details) {
     // tracked by the top frame.
     if (0 == details.frameId) {
         topFrame = true;
-        eventId  = eventCount++;
+        pageload = pageLoadCount++;
     } else {
         // Look for the parent-frame timestamp object, and add a reference to the
         // .subStamps property.
@@ -133,18 +145,18 @@ var stampStart = function(details) {
         // Look up the parent-frame timestamp and make sure that this subframe
         // is associated with the same eventId.
         if (process in inFlight) {
-            stamp = inFlight[process];
-            eventId = stamp.eventId;
+            stamp    = inFlight[process];
+            pageload = stamp.eventId;
         } else {
             // If a subframe load occurs after the parent-frame is no longer in-flight,
             // then it needs its own separate event count.
-            eventId = eventCount++;
+            pageload = pageLoadCount++;
         }
 
     }
 
     // Create an in-flight timestamp object, which waits for the frame to finish loading.
-    inFlight[key] = { process: process, eventId: eventId, start: new Date().getTime(), finish: 0, topFrame: topFrame, hostname: hostname, url: details.url, subStamps: [] };
+    inFlight[key] = { process: process, pageload: pageload, start: new Date().getTime(), finish: 0, topFrame: topFrame, hostname: hostname, url: details.url, subStamps: [] };
 
     console.log('key: ' + key + " = " + JSON.stringify(inFlight[key]));
 };
@@ -153,23 +165,41 @@ var stampFinish = function(details) {
     // Immediate check and return.
     if ('about:blank' === details.url) return;
 
+    // TODO: Immediate check and return.
+    // if (tab is incognito) return;
+
     var key = makeKey(details.tabId, details.processId, details.frameId);
     var stamp;
+
+    var storeStamp = {};
 
     // Get the timestamp from the in-flight table, and set the finished-loading timestamp.
     if (key in inFlight) {
         stamp = inFlight[key];
         stamp.finish = new Date().getTime();
+
+        // Save the page-load record to a more permanent log.
+        allPageLoads.push(stamp);
+
+        // Persist the record to localStorage.
+        storeStamp[storageId++] = stamp;
+        storage.local.set(storeStamp, function() {
+            console.log("Saved timestamp.");
+            if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
+        });
+
+        // Remove the page-load record from the in-flight table.
+        delete inFlight[key];
     }
-
-    // Save the page-load record to a more permanent log.
-    allPageLoads.push(stamp);
-
-    // Remove the page-load record from the in-flight table.
-    delete inFlight[key];
 
     console.log('key: ' + key + " = " + JSON.stringify(stamp));
 };
+
+
+/****************************************************************************
+ * webNavigation event handlers.
+ ****************************************************************************/
+
 
 // var onBeforeNavigateListener = function(details) {
 //     console.log("onBeforeNavigate" + JSON.stringify(details));
@@ -195,21 +225,44 @@ var onErrorOccurred = function(details) {
     stampFinish(details);
 };
 
-
-//chrome.cookies.onChanged.addListener(function(details) {
-//    // Add a timestamp to the Details object (as it's not currently provided).
-//    details['timestamp'] = new Date().getTime();
-//    console.log("onChanged" + JSON.stringify(details));
-//});
-
 // chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
 chrome.webNavigation.onCommitted.addListener(onCommitted);
 chrome.webNavigation.onCompleted.addListener(onCompletedListener);
 chrome.webNavigation.onErrorOccurred.addListener(onErrorOccurred);
 
 
+/****************************************************************************
+ * webRequest event handlers.
+ ****************************************************************************/
 
-// Management page stuff.
+// chrome.webRequest.onBeforeSendHeaders.addListener()
+
+
+/****************************************************************************
+ * Cookie event handlers.
+ ****************************************************************************/
+
+
+chrome.cookies.onChanged.addListener(function(details) {
+    // Add a timestamp to the Details object (as it's not currently provided).
+    details['timestamp'] = new Date().getTime();
+    console.log("onChanged" + JSON.stringify(details));
+});
+
+
+
+
+
+
+
+
+
+
+
+
+/****************************************************************************
+ * Management page stuff.
+ ****************************************************************************/
 
 function focusOrCreateTab(url) {
   chrome.windows.getAll({"populate":true}, function(windows) {
