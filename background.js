@@ -49,13 +49,6 @@
 var chrome = chrome || {};
 
 /**
- * Storage handle, for persisting timestamps.
- *
- * @type {chrome.storage|*}
- */
-var storage = chrome.storage;
-
-/**
  * Tracking table for in-flight page loads.
  *
  * key -- "tabId-processId-frameId"
@@ -92,19 +85,11 @@ var allPageLoads = [];
 var pageLoadCount = 0;
 
 /**
- * Database record ID, monotonically increasing.
- *
- * Each record needs one of these because localStorage is gimpy.
- *
- * @type {number}
- */
-var storageId = 0;
-
-/**
  *
  * @type {Array}
  */
 var cookieEvents = [];
+
 
 var makeKey = function(tabId, processId, frameId) {
     return tabId + "-" + processId + "-" + frameId;
@@ -156,7 +141,17 @@ var stampStart = function(details) {
     }
 
     // Create an in-flight timestamp object, which waits for the frame to finish loading.
-    inFlight[key] = { process: process, pageload: pageload, start: new Date().getTime(), finish: 0, topFrame: topFrame, hostname: hostname, url: details.url, subStamps: [] };
+    inFlight[key] = {
+        type: 'timestamp',
+        tabId: details.tabId,
+        process: process,
+        pageload: pageload,
+        start: new Date().getTime(),
+        finish: 0,
+        topFrame: topFrame,
+        hostname: hostname,
+        url: details.url,
+        subStamps: [] };
 
     console.log('key: ' + key + " = " + JSON.stringify(inFlight[key]));
 };
@@ -181,10 +176,10 @@ var stampFinish = function(details) {
         // Save the page-load record to a more permanent log.
         allPageLoads.push(stamp);
 
-        // Persist the record to localStorage.
-        storeStamp[storageId++] = stamp;
-        storage.local.set(storeStamp, function() {
-            console.log("Saved timestamp.");
+        // Persist the record to LocalStorage, using a timestamp as the key (irrelevant).
+        storeStamp[new Date().getTime()] = stamp;
+        chrome.storage.local.set(storeStamp, function() {
+            console.log("Saved timestamp data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
         });
 
@@ -235,7 +230,26 @@ chrome.webNavigation.onErrorOccurred.addListener(onErrorOccurred);
  * webRequest event handlers.
  ****************************************************************************/
 
-// chrome.webRequest.onBeforeSendHeaders.addListener()
+
+var standardFilter = {
+    urls: ['http://*/*', 'https://*/*']
+};
+
+chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
+    console.log("onBeforeSendHeaders" + JSON.stringify(details));
+}, standardFilter, ['requestHeaders']);
+
+chrome.webRequest.onSendHeaders.addListener(function(details) {
+    console.log("onSendHeaders" + JSON.stringify(details));
+}, standardFilter, ['requestHeaders']);
+
+chrome.webRequest.onHeadersReceived.addListener(function(details) {
+    console.log("onHeadersReceived" + JSON.stringify(details));
+}, standardFilter, ['responseHeaders']);
+
+chrome.webRequest.onCompleted.addListener(function(details) {
+    console.log("onCompleted" + JSON.stringify(details));
+}, standardFilter, ['responseHeaders']);
 
 
 /****************************************************************************

@@ -1,43 +1,101 @@
-<html>
-<head>
+<!doctype html>
+
 <style>
-table {
-  border-collapse:collapse;
-}
 
-td {
-  border: 1px solid black;
-  padding-left: 5px;
-}
+    .timeline {
 
-td.button {
-  border: none;
-}
+    }
 
-td.cookie_count {
-  text-align: right;
-}
+    .timeline rect {
+        fill: steelblue;
+    }
+
+    .timeline text {
+        fill: white;
+        font: 10px sans-serif;
+    }
 
 </style>
-<script src="manager.js"></script>
+
+<!--
+<svg class="chart" width="420" height="120">
+    <g transform="translate(0,0)">
+        <rect width="40" height="19"></rect>
+        <text x="37" y="9.5" dy=".35em">4</text>
+    </g>
+    <g transform="translate(0,20)">
+        <rect width="80" height="19"></rect>
+        <text x="77" y="9.5" dy=".35em">8</text>
+    </g>
+    <g transform="translate(0,40)">
+        <rect width="150" height="19"></rect>
+        <text x="147" y="9.5" dy=".35em">15</text>
+    </g>
+    <g transform="translate(0,60)">
+        <rect width="160" height="19"></rect>
+        <text x="157" y="9.5" dy=".35em">16</text>
+    </g>
+    <g transform="translate(0,80)">
+        <rect width="230" height="19"></rect>
+        <text x="227" y="9.5" dy=".35em">23</text>
+    </g>
+    <g transform="translate(0,100)">
+        <rect width="420" height="19"></rect>
+        <text x="417" y="9.5" dy=".35em">42</text>
+    </g>
+</svg>
+-->
+
+<html>
+<head>
+    <title>Cookie Monitor</title>
+
+    <link rel="stylesheet" href="manager.css"/>
+
+    <script src="libs/lodash.min.js"></script>
+    <script src="libs/d3.v3.min.js"></script>
+
+
+    <script src="manager.js"></script>
+
+    <!-- Unfortunately this makes our whole extension less secure, via CSP and unsafe-eval. :( -->
+    <!-- Because although Google "champions" open-source, they won't just release their Charts code. -->
+    <!-- <script src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1','packages':['timeline']}]}"></script> -->
 </head>
+
 <body>
-  <h2>Cookies! ... Nom Nom Nom...</h2>
-  <button id="remove_button">DELETE ALL!</button>
-  <div id="filter_div">
-    Filter: <input id="filter" type="text">
-    <button>x</button>
-  </div>
-  <br />
-  <div id="summary_div">
-    Showing <span id="filter_count"></span> of <span id="total_count"></span> cookie domains.
-    <span id="delete_all_button"></span>
-  </div>
-  <br />
-  <table id="cookies">
-    <tr class="header">
-      <th>Name</th>
-      <th>#Cookies</th>
-    </tr>
-  </body>
+<h2>Cookie Monitor</h2>
+
+<div>
+    Here be the visualizations.
+
+    <svg class="timeline"></svg>
+</div>
+
+<div>
+    Here be the old cookie example.
+
+
+
+    <button id="remove_button">DELETE ALL!</button>
+    <div id="filter_div">
+        Filter: <input id="filter" type="text">
+        <button>x</button>
+    </div>
+    <br/>
+
+    <div id="summary_div">
+        Showing <span id="filter_count"></span> of <span id="total_count"></span> cookie domains.
+        <span id="delete_all_button"></span>
+    </div>
+    <br/>
+    <table id="cookies">
+        <tr class="header">
+            <th>Name</th>
+            <th>#Cookies</th>
+        </tr>
+    </table>
+</div>
+
+</body>
 </html>
