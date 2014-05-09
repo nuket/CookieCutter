@@ -30,7 +30,7 @@
 // onCompleted{"frameId":0,"processId":546,"tabId":442,"timeStamp":1398930549596.515,"url":"https://vilimpoc.org/"} background.js:12
 //
 // onBeforeNavigate{"frameId":12,"parentFrameId":0,"processId":235,"tabId":152,"timeStamp":1399393519299.13,"url":"about:blank"} background.js:121
-// onCommitted{"frameId":12,"processId":235,"tabId":152,"timeStamp":1399393519306.4329,"transitionQualifiers":[],"transitionType":"auto_subframe","url":"about:blank"} background.js:127
+// webnavCommittedListener{"frameId":12,"processId":235,"tabId":152,"timeStamp":1399393519306.4329,"transitionQualifiers":[],"transitionType":"auto_subframe","url":"about:blank"} background.js:127
 // onCompleted{"frameId":12,"processId":235,"tabId":152,"timeStamp":1399393519307.112,"url":"about:blank"}
 //
 // So to track a new page load, we need to watch for:
@@ -42,7 +42,7 @@
 //
 
 "use strict";
-Logger.useDefaults();
+
 
 /**
  * Defined just for WebStorm to not keep asking.
@@ -73,7 +73,7 @@ var allPageLoads = [];
  * In other words, even if a page load action is
  * occurring due to a client_redirect / META refresh
  * we need a way to say that all the actions between
- * the onCommitted and onComplete/ErrorOccurred
+ * the webnavCommittedListener and onComplete/ErrorOccurred
  * belong to one page load action.
  *
  * Example: nytimes.com website will META refresh
@@ -89,7 +89,12 @@ var pageLoadCount = 0;
  *
  * @type {Array}
  */
-var cookieEvents = [];
+var allCookieEvents = [];
+
+
+var webnavLogger = Logger.get('webnav');
+var webreqLogger = Logger.get('webreq');
+var cookieLogger = Logger.get('cookie');
 
 
 var makeKey = function(tabId, processId, frameId) {
@@ -203,28 +208,23 @@ var stampFinish = function(details) {
 //     stampStart(details);
 // };
 
-var onCommitted = function(details) {
-    console.log("onCommitted" + JSON.stringify(details));
+var webnavCommittedListener = function(details) {
+    webnavLogger.debug("webnavCommittedListener " + JSON.stringify(details));
 
     stampStart(details);
 };
 
-var onCompletedListener = function(details) {
-    console.log("onCompleted" + JSON.stringify(details));
+var webnavCompletedListener = function(details) {
+    webnavLogger.debug("webnavCompletedListener " + JSON.stringify(details));
 
     stampFinish(details);
 };
 
-var onErrorOccurred = function(details) {
-    console.log("onErrorOccurred" + JSON.stringify(details));
+var webnavErrorOccurredListener = function(details) {
+    webnavLogger.debug("webnavErrorOccurredListener " + JSON.stringify(details));
 
     stampFinish(details);
 };
-
-// chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
-chrome.webNavigation.onCommitted.addListener(onCommitted);
-chrome.webNavigation.onCompleted.addListener(onCompletedListener);
-chrome.webNavigation.onErrorOccurred.addListener(onErrorOccurred);
 
 
 /****************************************************************************
@@ -237,19 +237,19 @@ var standardFilter = {
 };
 
 chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
-    console.log("onBeforeSendHeaders" + JSON.stringify(details));
+    webreqLogger.debug("onBeforeSendHeaders " + JSON.stringify(details));
 }, standardFilter, ['requestHeaders']);
 
 chrome.webRequest.onSendHeaders.addListener(function(details) {
-    console.log("onSendHeaders" + JSON.stringify(details));
+    webreqLogger.debug("onSendHeaders " + JSON.stringify(details));
 }, standardFilter, ['requestHeaders']);
 
 chrome.webRequest.onHeadersReceived.addListener(function(details) {
-    console.log("onHeadersReceived" + JSON.stringify(details));
+    webreqLogger.debug("onHeadersReceived " + JSON.stringify(details));
 }, standardFilter, ['responseHeaders']);
 
 chrome.webRequest.onCompleted.addListener(function(details) {
-    console.log("onCompleted" + JSON.stringify(details));
+    webreqLogger.debug("onCompleted " + JSON.stringify(details));
 }, standardFilter, ['responseHeaders']);
 
 
@@ -261,7 +261,7 @@ chrome.webRequest.onCompleted.addListener(function(details) {
 chrome.cookies.onChanged.addListener(function(details) {
     // Add a timestamp to the Details object (as it's not currently provided).
     details['timestamp'] = new Date().getTime();
-    console.log("onChanged" + JSON.stringify(details));
+    cookieLogger.debug("onChanged " + JSON.stringify(details));
 });
 
 
@@ -278,6 +278,7 @@ chrome.cookies.onChanged.addListener(function(details) {
 /****************************************************************************
  * Management page stuff.
  ****************************************************************************/
+
 
 function focusOrCreateTab(url) {
   chrome.windows.getAll({"populate":true}, function(windows) {
@@ -300,7 +301,30 @@ function focusOrCreateTab(url) {
   });
 }
 
-chrome.browserAction.onClicked.addListener(function(tab) {
-  var manager_url = chrome.extension.getURL("manager.html");
-  focusOrCreateTab(manager_url);
-});
+function browserActionClickedListener(tab) {
+    var manager_url = chrome.extension.getURL("manager.html");
+    focusOrCreateTab(manager_url);
+}
+
+
+/****************************************************************************
+ * main()
+ ****************************************************************************/
+
+
+(function main() {
+    Logger.useDefaults();
+    Logger.setLevel(Logger.WARN);
+
+    webnavLogger.setLevel(Logger.DEBUG);
+    webreqLogger.setLevel(Logger.WARN);
+    cookieLogger.setLevel(Logger.WARN);
+
+    // chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
+    chrome.webNavigation.onCommitted.addListener(webnavCommittedListener);
+    chrome.webNavigation.onCompleted.addListener(webnavCompletedListener);
+    chrome.webNavigation.onErrorOccurred.addListener(webnavErrorOccurredListener);
+
+    chrome.browserAction.onClicked.addListener(browserActionClickedListener);
+})();
+
