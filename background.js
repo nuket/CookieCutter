@@ -42,6 +42,7 @@
 //
 
 "use strict";
+Logger.useDefaults();
 
 /**
  * Defined just for WebStorm to not keep asking.

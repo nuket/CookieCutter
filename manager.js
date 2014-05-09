@@ -3,56 +3,87 @@
 //
 
 /**
- * Loads all of objects from Local Storage.
+ * Loads all objects from Local Storage.
  * We use Lodash to slice and dice these into views once they're in memory.
  */
 var allData = [];
 
-//var d3chart = function() {
-//    var data = [2, 4, 6, 10, 15, 20];
-//
-//    var x = d3.scale.linear().domain([0, d3.max(data)]).range([0, 200]);
-//
-//    d3.select(".d3chart")
-//        .selectAll("div")
-//        .data(data)
-//        .enter().append("div")
-//        .style("width", function (d) {
-//            // return d * 10 + "px";
-//            return x(d) + "px";
-//        })
-//        .text(function (d) {
-//            return d;
-//        });
-//};
+/**
+ * Used to calculate the position or width of a time or time duration.
+ * @type {number}
+ */
+var PX_PER_MS = 0.20;
 
-var timelineGenerator = function(selector, data) {
+var blockPosition = function(zeroTimeMs, timeMs) {
+    return d3.round((timeMs - zeroTimeMs) * PX_PER_MS, 2);
+};
+
+var blockWidth = function(timeDurationMs) {
+    return d3.round(timeDuration * PX_PER_MS, 2);
+};
+
+var nextUpdateOverview = 0;
+
+function updateOverview() {
+
+}
+
+function updateFrameLoads(selector, data) {
+}
+
+function updateSubframeLoads(selector, data) {
+    var barHeight = 40;
+
+    var zeroTimeMs = d3.min(data, function(d) { return d.start; });
+
+    var timeline = d3.select(selector);
+
+    var pageload = timeline.selectAll('g')
+        .data(data)
+        .enter().append('g')
+        .attr('transform', function(d, i) { return 'translate(' + blockPosition(zeroTimeMs, d.start) + ',' + barHeight + ')'; });
+
+    pageload.append('rect')
+        .attr('width', 10)
+        .attr('height', 10);
+}
+
+function timelineGenerator(selector, data) {
     var width     = 800,
-        barHeight = 20;
+        barHeight = 40;
 
-    var x = d3.scale.linear()
-        .domain([d3.min(data, function(d) { return d.start; }), d3.max(data, function(d) { return d.finish; })])
-        .range([0, width]);
+    var zeroTimeMs = d3.min(data, function(d) { return d.start; });
 
-    var timeline = d3.select(selector)
-        .attr('width', width)
-        .attr('height', barHeight * data.length);
+//    var x = d3.scale.linear()
+//        .domain([d3.min(data, function(d) { return d.start; }), d3.max(data, function(d) { return d.finish; })])
+//        .range([0, width]);
+
+    var timeline = d3.select(selector);
+        // .attr('width', width)
+        // .attr('height', );
 
     var pageload = timeline.selectAll('g')
         .data(data)
           .enter().append('g')
-        .attr('transform', function(d, i) { return "translate(0," + i * barHeight + ')'; });
+        .attr('transform', function(d, i) { return 'translate(' + blockPosition(zeroTimeMs, d.start) + ',0)'; });
 
     pageload.append('rect')
-        .attr('width', function(d) { return d.finish - d.start; })
+        .attr('width', function(d) { return (d.finish - d.start) / 5; })
         .attr('height', barHeight);
 
     pageload.append('text')
         .attr('x', 0)
         .attr('y', barHeight / 2)
         .attr('dy', '.35em')
-        .text(function(d) { return d.hostname; });
+        .text(function(d) { return d.hostname + " time: " + (d.finish - d.start) + "ms"; });
 };
+
+function updateTable(data) {
+    var template = $('#cookie-table-row-template').html();
+    Mustache.parse(template);
+    var rendered = Mustache.render(template, { cookies: data });
+    $('#cookieDataTable').html(rendered);
+}
 
 
 
@@ -298,8 +329,26 @@ function onload() {
         allData = _.values(item);
 
         // Callback soup begins.
-        timelineGenerator('.timeline', _.filter(_.values(item), { 'topFrame': true }));
+        timelineGenerator('svg#liveTimeline', _.sortBy(_.filter(allData, { 'type': 'timestamp', 'topFrame': true }), 'start'));
+
+        updateSubframeLoads('svg#liveTimeline', _.sortBy(_.filter(allData, { 'type': 'timestamp', 'topFrame': false }), 'start'));
+
+        updateTable(_.sortBy(allData, 'start'));
     });
+
+    // Register for update event messages from the CookieMonitor extension.
+    //
+    // The objects are added to Local Storage by the extension already, and
+    // can simply be pushed into the allData array (and a screen redraw can
+    // be ordered).
+    chrome.runtime.onConnect.addListener(function (port) {
+        console.assert(port.name == "CookieMonitor");
+        port.onMessage.addListener(function (message) {
+            // Check that the message is the kind of data object we're expecting.
+            // allData.push(message);
+        });
+    });
+
 
     // Cookie Stuff.
 
