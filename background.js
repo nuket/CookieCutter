@@ -163,7 +163,6 @@ var stampStart = function(details) {
     inFlight[key] = {
         type: 'pageLoad',
         tabId: details.tabId,
-        process: process,
         pageload: pageload,
         start: new Date().getTime(),
         finish: 0,
@@ -226,13 +225,15 @@ function updatePageViewDetails(details) {
     // info to the tracking table.
     var stamp;
     var storeStamp = {};
+    
+    var timeMs = new Date().getTime();
 
     if (details.tabId in pageViewTable) {
         stamp = pageViewTable[details.tabId];
-        stamp.finish = new Date().getTime();
+        stamp.finish = timeMs;
 
         // Save the stamp into Local Storage.
-        storeStamp[new Date().getTime()] = stamp;
+        storeStamp[timeMs] = stamp;
         chrome.storage.local.set(storeStamp, function() {
             stampsLogger.debug("Saved page view duration data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
@@ -242,7 +243,7 @@ function updatePageViewDetails(details) {
     stamp = {
         type: 'pageViewDetails',
         tabId: details.tabId,
-        start: new Date().getTime(),
+        start: timeMs,
         finish: 0,
         hostname: new URL(details.url).hostname,
         pageUrl: details.url };
@@ -286,7 +287,6 @@ function webnavErrorOccurredListener(details) {
  * webRequest event handlers.
  ****************************************************************************/
 
-
 var standardFilter = {
     urls: ['http://*/*', 'https://*/*']
 };
@@ -301,11 +301,11 @@ chrome.webRequest.onSendHeaders.addListener(function(details) {
     // If the current request had a "Cookie" header, then
     // make a note that a cookie was sent.
 
-    var cookiePresent = _.find(details.requestHeaders, {'name': 'Cookie'});
+    var cookiesPresent = _.filter(details.requestHeaders, {'name': 'Cookie'});
     var currentPage;
 
     // Immediate check and return.
-    if (!cookiePresent) return;
+    if (!cookiesPresent || 0 == cookiesPresent.length) return;
 
     // Look up the current Page in the Tab that is loading.
     if (details.tabId in pageViewTable) {
@@ -324,8 +324,9 @@ chrome.webRequest.onSendHeaders.addListener(function(details) {
             tabId: details.tabId,
             timestamp: timeMs,
             hostname: new URL(details.url).hostname,
-            pageUrl: currentPage.url,
-            targetUrl: details.url };
+            pageUrl: currentPage.pageUrl,
+            targetUrl: details.url,
+            cookiesPresent: cookiesPresent };
 
         chrome.storage.local.set(storeStamp, function() {
             stampsLogger.debug("Saved cookieSent data.");
@@ -339,8 +340,42 @@ chrome.webRequest.onHeadersReceived.addListener(function(details) {
 
     // If the current request had a "Set-cookie" header, then
     // make a note that a cookie was received.
+    
+    // var cookiePresent = _.find(details.responseHeaders, {'name': 'Set-Cookie'});
+    var cookiesPresent = _.filter(details.responseHeaders, function(header) {
+        return header.name.match(/set\-cookie/i);
+    });
+    var currentPage;
 
+    // Immediate check and return.
+    if (!cookiesPresent || 0 == cookiesPresent.length) return;
 
+    // Look up the current Page in the Tab that is loading.
+    if (details.tabId in pageViewTable) {
+        currentPage = pageViewTable[details.tabId];
+
+        webreqLogger.debug("Existing page " + JSON.stringify(currentPage));
+
+        // Add an entry to Local Storage associating the current Cookie
+        // request to the Page currently in the Tab.
+
+        var storeStamp = {};
+        var timeMs = new Date().getTime();
+
+        storeStamp[timeMs] = {
+            type: 'cookieReceived',
+            tabId: details.tabId,
+            timestamp: timeMs,
+            hostname: new URL(details.url).hostname,
+            pageUrl: currentPage.url,
+            targetUrl: details.url,
+            cookiesPresent: cookiesPresent };
+
+        chrome.storage.local.set(storeStamp, function() {
+            stampsLogger.debug("Saved cookieReceived data.");
+            if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
+        });
+    }
 }, standardFilter, ['responseHeaders']);
 
 chrome.webRequest.onCompleted.addListener(function(details) {
@@ -349,29 +384,46 @@ chrome.webRequest.onCompleted.addListener(function(details) {
 
 
 /****************************************************************************
+ * Tab event handlers.
+ ****************************************************************************/
+
+
+chrome.tabs.onRemoved.addListener(function(tabId, removeInfo) {
+    var timeMs = new Date().getTime();
+    var stamp;
+    var storeStamp = {};
+    
+    // Look up the pageView object, and mark its finished timestamp.
+    if (tabId in pageViewTable) {
+        stamp = pageViewTable[tabId];
+        stamp.finish = timeMs;
+
+        // Save the stamp into Local Storage.
+        storeStamp[timeMs] = stamp;
+        chrome.storage.local.set(storeStamp, function() {
+            stampsLogger.debug("Tab removed: Saved page view duration data.");
+            if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
+        });
+        
+        // Remove the object from the pageViewTable, otherwise it's a leak.
+        delete pageViewTable[tabId];
+    }
+});
+
+
+/****************************************************************************
  * Cookie event handlers.
  ****************************************************************************/
 
 
-chrome.cookies.onChanged.addListener(function(details) {
-    // Add a timestamp to the Details object (as it's not currently provided).
-    details['timestamp'] = new Date().getTime();
-    cookieLogger.debug("onChanged " + JSON.stringify(details));
+// chrome.cookies.onChanged.addListener(function(details) {
+    // // Add a timestamp to the Details object (as it's not currently provided).
+    // details['timestamp'] = new Date().getTime();
+    // cookieLogger.debug("onChanged " + JSON.stringify(details));
 
-    // Record the details into the cookie objects to be persisted into
-    // Local Storage.
-
-});
-
-
-
-
-
-
-
-
-
-
+    // // Record the details into the cookie objects to be persisted into
+    // // Local Storage.
+// });
 
 
 /****************************************************************************
@@ -410,6 +462,10 @@ function browserActionClickedListener(tab) {
  * Debugging Stuff.
  ****************************************************************************/
 
+ 
+function clearLocalStorage() {
+    chrome.storage.local.clear();
+}
 
 function dumpLocalStorage() {
     chrome.storage.local.get(null, function(dump) {
@@ -417,6 +473,13 @@ function dumpLocalStorage() {
     });
 }
 
+function sizeLocalStorage() {
+    chrome.storage.local.getBytesInUse(null, function(data) { 
+        console.log(data); 
+    });
+    
+    return;
+}
 
 /****************************************************************************
  * main()
