@@ -43,7 +43,6 @@
 
 "use strict";
 
-
 /**
  * Defined just for WebStorm to not keep asking.
  */
@@ -55,6 +54,20 @@ var chrome = chrome || {};
  * key -- "tabId-processId-frameId"
  */
 var inFlight = {};
+
+/**
+ * Tracking table for the amount of time spent by a Tab on a specific Page.
+ *
+ * We look at the web navigation onCommitted events, which tell how long a
+ * Tab has been on a page before the next page is browsed to.
+ *
+ * Data looks something like:
+ * pageViewDuration[tabId] = { type: 'pageviewduration', url: URL, entered: timestamp, left: timestamp }
+ *
+ * When entered and left have been filled in, the entry gets pushed into
+ * Local Storage for later processing.
+ */
+var pageViewTable = {};
 
 /**
  * A list of all page loads made during a session.
@@ -95,6 +108,7 @@ var allCookieEvents = [];
 var webnavLogger = Logger.get('webnav');
 var webreqLogger = Logger.get('webreq');
 var cookieLogger = Logger.get('cookie');
+var stampsLogger = Logger.get('stamps');
 
 
 var makeKey = function(tabId, processId, frameId) {
@@ -109,7 +123,6 @@ var stampStart = function(details) {
     // if (tab is incognito) return;
 
     var key      = makeKey(details.tabId, details.processId, details.frameId);  //!< All frames and subframes have a unique identifier.
-    var hostname = new URL(details.url).hostname;
     var topFrame = false;
     var process  = makeKey(details.tabId, details.processId, 0);
     var pageload = -1;                                                          //!< All actions between the start and finish of the top-frame action count as the same event.
@@ -148,18 +161,18 @@ var stampStart = function(details) {
 
     // Create an in-flight timestamp object, which waits for the frame to finish loading.
     inFlight[key] = {
-        type: 'timestamp',
+        type: 'pageLoad',
         tabId: details.tabId,
         process: process,
         pageload: pageload,
         start: new Date().getTime(),
         finish: 0,
         topFrame: topFrame,
-        hostname: hostname,
-        url: details.url,
+        hostname: new URL(details.url).hostname,
+        pageUrl: details.url,
         subStamps: [] };
 
-    console.log('key: ' + key + " = " + JSON.stringify(inFlight[key]));
+    stampsLogger.debug('key: ' + key + " = " + JSON.stringify(inFlight[key]));
 };
 
 var stampFinish = function(details) {
@@ -185,7 +198,7 @@ var stampFinish = function(details) {
         // Persist the record to LocalStorage, using a timestamp as the key (irrelevant).
         storeStamp[new Date().getTime()] = stamp;
         chrome.storage.local.set(storeStamp, function() {
-            console.log("Saved timestamp data.");
+            stampsLogger.debug("Saved timestamp data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
         });
 
@@ -193,8 +206,49 @@ var stampFinish = function(details) {
         delete inFlight[key];
     }
 
-    console.log('key: ' + key + " = " + JSON.stringify(stamp));
+    stampsLogger.debug('key: ' + key + " = " + JSON.stringify(stamp));
 };
+
+function updatePageViewDetails(details) {
+    // Immediate check and return.
+    if ('about:blank' === details.url) return;
+
+    // Immediate check and return.
+    if (0 != details.frameId) return;
+
+    // Check whether the tab was already looking at another webpage.
+    //
+    // If so, then the duration that the other webpage was being viewed
+    // can be determined.
+    //
+    // If the tab isn't already looking at a webpage (or was newly
+    // created and not in the tracking table), then add the page
+    // info to the tracking table.
+    var stamp;
+    var storeStamp = {};
+
+    if (details.tabId in pageViewTable) {
+        stamp = pageViewTable[details.tabId];
+        stamp.finish = new Date().getTime();
+
+        // Save the stamp into Local Storage.
+        storeStamp[new Date().getTime()] = stamp;
+        chrome.storage.local.set(storeStamp, function() {
+            stampsLogger.debug("Saved page view duration data.");
+            if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
+        });
+    }
+
+    stamp = {
+        type: 'pageViewDetails',
+        tabId: details.tabId,
+        start: new Date().getTime(),
+        finish: 0,
+        hostname: new URL(details.url).hostname,
+        pageUrl: details.url };
+
+    pageViewTable[details.tabId] = stamp;
+}
 
 
 /****************************************************************************
@@ -202,29 +256,30 @@ var stampFinish = function(details) {
  ****************************************************************************/
 
 
-// var onBeforeNavigateListener = function(details) {
-//     console.log("onBeforeNavigate" + JSON.stringify(details));
+//function onBeforeNavigateListener(details) {
+//    webnavLogger.debug("onBeforeNavigate" + JSON.stringify(details));
 //
-//     stampStart(details);
-// };
+//    // stampStart(details);
+//};
 
-var webnavCommittedListener = function(details) {
-    webnavLogger.debug("webnavCommittedListener " + JSON.stringify(details));
+function webnavCommittedListener(details) {
+    webnavLogger.debug("onCommitted " + JSON.stringify(details));
 
     stampStart(details);
-};
+    updatePageViewDetails(details);
+}
 
-var webnavCompletedListener = function(details) {
-    webnavLogger.debug("webnavCompletedListener " + JSON.stringify(details));
-
-    stampFinish(details);
-};
-
-var webnavErrorOccurredListener = function(details) {
-    webnavLogger.debug("webnavErrorOccurredListener " + JSON.stringify(details));
+function webnavCompletedListener(details) {
+    webnavLogger.debug("onCompleted " + JSON.stringify(details));
 
     stampFinish(details);
-};
+}
+
+function webnavErrorOccurredListener(details) {
+    webnavLogger.debug("onErrorOccurred " + JSON.stringify(details));
+
+    stampFinish(details);
+}
 
 
 /****************************************************************************
@@ -242,10 +297,50 @@ chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
 
 chrome.webRequest.onSendHeaders.addListener(function(details) {
     webreqLogger.debug("onSendHeaders " + JSON.stringify(details));
+
+    // If the current request had a "Cookie" header, then
+    // make a note that a cookie was sent.
+
+    var cookiePresent = _.find(details.requestHeaders, {'name': 'Cookie'});
+    var currentPage;
+
+    // Immediate check and return.
+    if (!cookiePresent) return;
+
+    // Look up the current Page in the Tab that is loading.
+    if (details.tabId in pageViewTable) {
+        currentPage = pageViewTable[details.tabId];
+
+        webreqLogger.debug("Existing page " + JSON.stringify(currentPage));
+
+        // Add an entry to Local Storage associating the current Cookie
+        // request to the Page currently in the Tab.
+
+        var storeStamp = {};
+        var timeMs = new Date().getTime();
+
+        storeStamp[timeMs] = {
+            type: 'cookieSent',
+            tabId: details.tabId,
+            timestamp: timeMs,
+            hostname: new URL(details.url).hostname,
+            pageUrl: currentPage.url,
+            targetUrl: details.url };
+
+        chrome.storage.local.set(storeStamp, function() {
+            stampsLogger.debug("Saved cookieSent data.");
+            if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
+        });
+    }
 }, standardFilter, ['requestHeaders']);
 
 chrome.webRequest.onHeadersReceived.addListener(function(details) {
     webreqLogger.debug("onHeadersReceived " + JSON.stringify(details));
+
+    // If the current request had a "Set-cookie" header, then
+    // make a note that a cookie was received.
+
+
 }, standardFilter, ['responseHeaders']);
 
 chrome.webRequest.onCompleted.addListener(function(details) {
@@ -262,6 +357,10 @@ chrome.cookies.onChanged.addListener(function(details) {
     // Add a timestamp to the Details object (as it's not currently provided).
     details['timestamp'] = new Date().getTime();
     cookieLogger.debug("onChanged " + JSON.stringify(details));
+
+    // Record the details into the cookie objects to be persisted into
+    // Local Storage.
+
 });
 
 
@@ -308,6 +407,18 @@ function browserActionClickedListener(tab) {
 
 
 /****************************************************************************
+ * Debugging Stuff.
+ ****************************************************************************/
+
+
+function dumpLocalStorage() {
+    chrome.storage.local.get(null, function(dump) {
+        console.log(dump);
+    });
+}
+
+
+/****************************************************************************
  * main()
  ****************************************************************************/
 
@@ -317,10 +428,11 @@ function browserActionClickedListener(tab) {
     Logger.setLevel(Logger.WARN);
 
     webnavLogger.setLevel(Logger.DEBUG);
-    webreqLogger.setLevel(Logger.WARN);
-    cookieLogger.setLevel(Logger.WARN);
+    webreqLogger.setLevel(Logger.DEBUG);
+    cookieLogger.setLevel(Logger.DEBUG);
+    stampsLogger.setLevel(Logger.DEBUG);
 
-    // chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
+//    chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigateListener);
     chrome.webNavigation.onCommitted.addListener(webnavCommittedListener);
     chrome.webNavigation.onCompleted.addListener(webnavCompletedListener);
     chrome.webNavigation.onErrorOccurred.addListener(webnavErrorOccurredListener);

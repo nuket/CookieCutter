@@ -20,7 +20,7 @@
         "default_icon": "cookie.png"
     },
     "background": {
-        "scripts": ["libs/logger.min.js", "background.js"]
+        "scripts": ["libs/lodash.min.js", "libs/logger.min.js", "background.js"]
     },
     "content_security_policy": "script-src 'self' https://www.google.com 'unsafe-eval'; object-src 'self'",
     "manifest_version": 2
