@@ -37,17 +37,6 @@ var inFlight = {};
 var pageViewTable = {};
 
 /**
- * A list of all page loads made during a session.
- *
- * Objects within the list have the following properties for filtering:
- *
- * topFrame -- true or false depending on whether the load was of a top-level frame or a subframe.
- *
- * @type {Array}
- */
-var allPageLoads = [];
-
-/**
  * Use the event count to group the page-load actions together.
  *
  * In other words, even if a page load action is
@@ -129,8 +118,7 @@ var stampStart = function(details) {
         finish: 0,
         topFrame: topFrame,
         hostname: new URL(details.url).hostname,
-        pageUrl: details.url,
-        subStamps: [] };
+        pageUrl: details.url };
 
     stampsLogger.debug('key: ' + key + " = " + JSON.stringify(inFlight[key]));
 };
@@ -152,11 +140,8 @@ var stampFinish = function(details) {
         stamp = inFlight[key];
         stamp.finish = new Date().getTime();
 
-        // Save the page-load record to a more permanent log.
-        allPageLoads.push(stamp);
-
         // Persist the record to LocalStorage, using a timestamp as the key (irrelevant).
-        storeStamp[new Date().getTime()] = stamp;
+        storeStamp[stamp.finish] = stamp;
         chrome.storage.local.set(storeStamp, function() {
             stampsLogger.debug("Saved timestamp data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);

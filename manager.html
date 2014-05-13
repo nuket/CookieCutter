@@ -8,15 +8,16 @@
 
     <script src="libs/lodash.min.js"></script>
     <script src="libs/zepto.min.js"></script>
+    <script src="libs/logger.min.js"></script>
     <script src="libs/mustache.js"></script>
     <script src="libs/d3.v3.min.js"></script>
 
-    <script id="cookie-table-row-template" type="text/x-handlebars-template">
-        {{#cookies}}
+    <script id="pageload-row-template" type="text/x-handlebars-template">
+        {{#pageloads}}
         <div class="timestamp">
-            {{start}} {{finish}} {{hostname}} {{pageload}} {{topFrame}}
+            <a href="#/{{start}}-{{finish}}-{{tabId}}">{{start}} {{finish}} {{topFrame}} {{hostname}} {{pageUrl}}</a>
         </div>
-        {{/cookies}}
+        {{/pageloads}}
     </script>
 
     <script src="manager.js"></script>
@@ -27,14 +28,17 @@
 </head>
 
 <body>
+<!--
 <div id="container">
     <svg id="liveTimeline"></svg>
 </div>
+-->
+<div id="header">Cookie Monitor [ 30s | 60s | 5m ]</div>
+<div id="liveTrackerDiv"><svg id="liveTracker"></svg></div>
 
-<div id="cookieDataTable"></div>
+<div id="pageloadTable"></div>
 
-<h2>Cookie Monitor</h2>
-
+<!--
 <div>
     Here be the old cookie example.
 
@@ -59,6 +63,7 @@
         </tr>
     </table>
 </div>
+-->
 
 </body>
 </html>

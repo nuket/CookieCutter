@@ -6,11 +6,6 @@ html, body {
     padding: 0;
 }
 
-svg#liveTimeline, #container {
-    width: 100%;
-    height: 90%;
-}
-
 table {
     border-collapse: collapse;
 }
@@ -37,11 +32,10 @@ td.cookie_count {
     color: white;
 }
 
-svg#liveTimeline rect {
-    fill: steelblue;
+svg#liveTracker {
+    height: 2in;
 }
 
-svg#liveTimeline text {
-    fill: white;
-    font: 10px sans-serif;
+svg#liveTracker rect {
+    fill: gray;
 }
