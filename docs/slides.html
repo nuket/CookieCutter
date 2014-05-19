@@ -58,6 +58,11 @@
 							<li>What webpages use the same ad networks?</li>
 						</ol>
 					</p>
+					<aside class="notes">
+						Third-party websites (i.e. not within the same domain as
+						the original request, would generally be considered ad
+						networks).
+					</aside>
 				</section>
 
 				<section>
@@ -65,15 +70,12 @@
 					<h3>Google Chrome Extensions</h3>
 					<p>
 						<ul>
-							<li>can respond to cookie events</li>
+							<li>can see cookie events</li>
 							<li>can intercept HTTP requests</li>
 							<li>can read/write Local Storage</li>
+							<li>can see tab create/close</li>
 						</ul>
 					</p>
-				</section>
-
-				<section>
-					<h2>We Need Data</h2>
 				</section>
 
 				<section>
@@ -90,6 +92,10 @@
     "http://*/*",
     "https://*/*" ],
 					</code></pre>
+				</section>
+
+				<section>
+					<h2>We Need Data</h2>
 				</section>
 
 				<section>
@@ -119,8 +125,17 @@
 				</section>
 
 				<section>
+					<h2>Data: tabs</h2>
 					<p>
-						Add these to Local Storage.
+						We track tab information at runtime.
+					</p>
+					<pre><code data-trim="" contenteditable="" class="actionscript">
+					</code></pre>
+				</section>
+
+				<section>
+					<p>
+						Add data to Local Storage.
 					</p>
 					<p>
 						Save incrementally, using timestamp as a key.
@@ -142,6 +157,13 @@
 				</section>
 
 				<section>
+					<h2>live monitoring</h2>
+					<p>
+						animated cookie icon, &#8593;&#8595;
+					</p>
+				</section>
+
+				<section>
 					<h2>webpage &#8594; ad networks graph</h2>
 				</section>
 
@@ -149,7 +171,9 @@
 					<h2>ad network &#8594; webpages graph</h2>
 				</section>
 
-
+				<section>
+					<h2>blocking</h2>
+				</section>
 
 				<!-- Example of nested vertical slides -->
 				<!--
@@ -443,8 +467,8 @@ function linkify( selector ) {
 				-->
 
 				<section>
-					<h1>THE END</h1>
-					<h3>BY Max Vilimpoc / <a href="https://vilimpoc.org">vilimpoc.org</a></h3>
+					<h1>that's all, folks!</h1>
+					<h3>Max Vilimpoc / <a href="https://vilimpoc.org">vilimpoc.org</a></h3>
 				</section>
 
 			</div>
