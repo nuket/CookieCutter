@@ -76,6 +76,16 @@ chrome.webRequest.onHeadersReceived.addListener((details) => {
 //     })
 // })
 
+// --------------------------------------------------------------------------
+// chrome.cookies
+// --------------------------------------------------------------------------
+
+let updateStatsTimeoutId;
+
+const updateStats = (stats) => {
+    console.log(stats);
+}
+
 chrome.cookies.onChanged.addListener((details) => {
     console.log('chrome.cookies.onChanged');
 
@@ -116,7 +126,18 @@ chrome.cookies.onChanged.addListener((details) => {
         console.log(details);
     }
 
-    console.log(stats);
+    // console.log(stats);
+    // chrome.storage.local.set({ stats: stats });
+
+    // Rate limit the updates to once every 2 seconds.
+    // Since cookies are set rapidly in groups while a page is loading, we
+    // don't need to hammer the storage instance.
+    if (updateStatsTimeoutId) {
+        clearTimeout(updateStatsTimeoutId);
+        updateStatsTimeoutId = 0;
+    }
+
+    updateStatsTimeoutId = setTimeout(updateStats, 2000, stats);
 });
 
 // var optionsTab;
