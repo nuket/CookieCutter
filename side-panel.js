@@ -34,27 +34,57 @@ slider.addEventListener('input', function() {
     valueDisplay.textContent = this.value;
 });
 
-// const pizzaEvent = new CustomEvent("pizzaDelivery", {
-//     detail: {
-//         name: "supreme",
-//     },
-// });
+let currentStats = {
+    active: 0,
+    added: 0,
+    updated: 0,
+    removed: 0,
+    expired: 0
+};
 
-// const pizzaStore = document.querySelector('#pizza-store');
-// pizzaStore.addEventListener("pizzaDelivery", (e) => console.log(e.detail.name));
-// pizzaStore.dispatchEvent(pizzaEvent);
+let newStats = {
+    active: 0,
+    added: 0,
+    updated: 0,
+    removed: 0,
+    expired: 0
+};
 
-// window.addEventListener('pizzaDelivery', (e) => console.log(e.detail.name));
-// window.dispatchEvent(pizzaEvent);
+let updateStatsIntervalId = 0;
+
+const updateStats = (a, b) => {
+    let diff = 0;
+
+    if (a.active  < b.active)  { diff++; a.active++;  }
+    if (a.added   < b.added)   { diff++; a.added++;   }
+    if (a.updated < b.updated) { diff++; a.updated++; }
+    if (a.removed < b.removed) { diff++; a.removed++; }
+    if (a.expired < b.expired) { diff++; a.expired++; }
+
+    document.getElementById('stats-active').textContent  = a.active;
+    document.getElementById('stats-added').textContent   = a.added;
+    document.getElementById('stats-updated').textContent = a.updated;
+    document.getElementById('stats-removed').textContent = a.removed;
+    document.getElementById('stats-expired').textContent = a.expired;
+
+    if (diff == 0) {
+        if (updateStatsIntervalId) {
+            clearInterval(updateStatsIntervalId);
+            updateStatsIntervalId = 0;
+        }
+    }
+};
 
 window.addEventListener('statsUpdateEvent', (e) => {
-    const stats = e.detail.stats;
+    newStats = e.detail.stats;
 
-    document.getElementById('stats-active').textContent  = stats.active;
-    document.getElementById('stats-added').textContent   = stats.added;
-    document.getElementById('stats-updated').textContent = stats.updated;
-    document.getElementById('stats-removed').textContent = stats.removed;
-    document.getElementById('stats-expired').textContent = stats.expired;
+    updateStatsIntervalId = setInterval(updateStats, 33, currentStats, newStats);
+
+    // document.getElementById('stats-active').textContent  = stats.active;
+    // document.getElementById('stats-added').textContent   = stats.added;
+    // document.getElementById('stats-updated').textContent = stats.updated;
+    // document.getElementById('stats-removed').textContent = stats.removed;
+    // document.getElementById('stats-expired').textContent = stats.expired;
 });
 
 
