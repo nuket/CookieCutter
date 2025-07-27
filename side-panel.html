@@ -1,14 +1,12 @@
 <!doctype html>
 <html>
 <head>
-<meta charset="UTF-8">
-<style>
-    #customSlider { width: 100%; }
-</style>
+    <meta charset="UTF-8">
+    <style>
+        #customSlider { width: 100%; }
+    </style>
 </head>
 <body>
-    <h1>Cookie Monitor</h1>
-
     <p>
         As you browse the web, cookies track you from Google, Facebook, Amazon,
         a million different ad networks, data brokers, and others.
@@ -17,6 +15,8 @@
     <h2>Statistics</h2>
 
     <div>
+        <div>Active (total active in the browser cookie database)</div>
+        <div id="stats-active">0</div>
         <div>Added</div>
         <div id="stats-added">0</div>
         <div>Updated</div>
@@ -26,6 +26,11 @@
         <div>Expired</div>
         <div id="stats-expired">0</div>
     </div>
+
+    <!-- <div role="tooltip" id="stats-active-tip">
+        This is the total number of cookies currently active in the browser
+        cookie database.
+    </div> -->
 
     <div id="pizza-store"></div>
 
@@ -54,7 +59,7 @@
 
     <textarea id="deny"></textarea>
 
-    <script src="side-panel.js"></script>
+    <script src="side-panel.js" type="module"></script>
 
     Made with ❤️ <a href="https://vilimpoc.org">in Berlin</a>
 </body>

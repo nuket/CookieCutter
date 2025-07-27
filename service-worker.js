@@ -87,6 +87,8 @@ const updateStats = async (stats) => {
     let cookies = await chrome.cookies.getAll({});
     stats.active = cookies.length;
 
+    chrome.storage.local.set({ stats: stats });
+
     console.log(stats);
 }
 
@@ -137,9 +139,6 @@ chrome.cookies.onChanged.addListener((details) => {
         console.log('Unknown combination of details seen.');
         console.log(details);
     }
-
-    // console.log(stats);
-    // chrome.storage.local.set({ stats: stats });
 
     // Rate limit the updates to once every 2 seconds.
     // Since cookies are set rapidly in groups while a page is loading, we

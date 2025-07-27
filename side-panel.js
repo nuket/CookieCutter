@@ -13,7 +13,7 @@ console.log('Run side-panel.js');
 
 //     let out = {};
 //     details.forEach(detail => {
-//         if (cookie[detail]) out[detail] = cookie[detail];
+    //         if (cookie[detail]) out[detail] = cookie[detail];
 //     });
 
 //     const protocol = cookie.secure ? 'https:' : 'http:';
@@ -34,19 +34,28 @@ slider.addEventListener('input', function() {
     valueDisplay.textContent = this.value;
 });
 
-const pizzaEvent = new CustomEvent("pizzaDelivery", {
-  detail: {
-    name: "supreme",
-  },
-});
+// const pizzaEvent = new CustomEvent("pizzaDelivery", {
+//     detail: {
+//         name: "supreme",
+//     },
+// });
 
 // const pizzaStore = document.querySelector('#pizza-store');
 // pizzaStore.addEventListener("pizzaDelivery", (e) => console.log(e.detail.name));
 // pizzaStore.dispatchEvent(pizzaEvent);
 
-window.addEventListener('pizzaDelivery', (e) => console.log(e.detail.name));
-window.dispatchEvent(pizzaEvent);
+// window.addEventListener('pizzaDelivery', (e) => console.log(e.detail.name));
+// window.dispatchEvent(pizzaEvent);
 
+window.addEventListener('statsUpdateEvent', (e) => {
+    const stats = e.detail.stats;
+
+    document.getElementById('stats-active').textContent  = stats.active;
+    document.getElementById('stats-added').textContent   = stats.added;
+    document.getElementById('stats-updated').textContent = stats.updated;
+    document.getElementById('stats-removed').textContent = stats.removed;
+    document.getElementById('stats-expired').textContent = stats.expired;
+});
 
 
 function stripCookie(cookie, newExpiry) {
@@ -151,3 +160,24 @@ document.getElementById('getAll').addEventListener('click', clickGetAll);
 
 //     return `Deleted ${cookiesDeleted} cookie(s).`;
 // }
+
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
+        console.log(
+            `Storage key "${key}" in namespace "${namespace}" changed.`,
+            `Old value was "${oldValue}", new value is "${newValue}".`
+        );
+
+        if (key === 'stats') {
+            // const stats = newValue;
+            // console.log(newValue);
+
+            // Update the various observers.
+            window.dispatchEvent(new CustomEvent('statsUpdateEvent', {
+                detail: {
+                    stats: newValue
+                }
+            }));
+        }
+    }
+});
