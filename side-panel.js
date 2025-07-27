@@ -24,15 +24,15 @@ console.log('Run side-panel.js');
 //     return out;
 // }
 
-const slider = document.getElementById('customSlider');
-const valueDisplay = document.getElementById('value');
-const customSteps = [5, 60, 6 * 60, 12 * 60, 24 * 60, 2 * 24 * 60, 3 * 24 * 60];
+// const slider = document.getElementById('customSlider');
+// const valueDisplay = document.getElementById('value');
+// const customSteps = [5, 60, 6 * 60, 12 * 60, 24 * 60, 2 * 24 * 60, 3 * 24 * 60];
 
-slider.addEventListener('input', function() {
-    const index = Math.round(this.value / (this.max / (customSteps.length - 1)));
-    this.value = customSteps[index];
-    valueDisplay.textContent = this.value;
-});
+// slider.addEventListener('input', function() {
+//     const index = Math.round(this.value / (this.max / (customSteps.length - 1)));
+//     this.value = customSteps[index];
+//     valueDisplay.textContent = this.value;
+// });
 
 let currentStats = {
     active: 0,
@@ -77,16 +77,8 @@ const updateStats = (a, b) => {
 
 window.addEventListener('statsUpdateEvent', (e) => {
     newStats = e.detail.stats;
-
     updateStatsIntervalId = setInterval(updateStats, 33, currentStats, newStats);
-
-    // document.getElementById('stats-active').textContent  = stats.active;
-    // document.getElementById('stats-added').textContent   = stats.added;
-    // document.getElementById('stats-updated').textContent = stats.updated;
-    // document.getElementById('stats-removed').textContent = stats.removed;
-    // document.getElementById('stats-expired').textContent = stats.expired;
 });
-
 
 function stripCookie(cookie, newExpiry) {
     const protocol = cookie.secure ? 'https:' : 'http:';
@@ -160,7 +152,7 @@ async function clickGetAll(e) {
     });
 };
 
-document.getElementById('getAll').addEventListener('click', clickGetAll);
+// document.getElementById('getAll').addEventListener('click', clickGetAll);
 
 // // The async IIFE is necessary because Chrome <89 does not support top level await.
 // (async function initPopupWindow() {
