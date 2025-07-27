@@ -55,19 +55,23 @@ let updateStatsIntervalId = 0;
 const updateStats = (a, b) => {
     let diff = 0;
 
-    if (a.active  < b.active)  { diff++; a.active++;  }
+    // active is the only field that can decrement
+    if      (a.active  < b.active)  { diff++; a.active++;  }
+    else if (a.active  > b.active)  { diff++; a.active--;  }
+
     if (a.added   < b.added)   { diff++; a.added++;   }
     if (a.updated < b.updated) { diff++; a.updated++; }
     if (a.removed < b.removed) { diff++; a.removed++; }
     if (a.expired < b.expired) { diff++; a.expired++; }
 
-    document.getElementById('stats-active').textContent  = a.active;
-    document.getElementById('stats-added').textContent   = a.added;
-    document.getElementById('stats-updated').textContent = a.updated;
-    document.getElementById('stats-removed').textContent = a.removed;
-    document.getElementById('stats-expired').textContent = a.expired;
-
-    if (diff == 0) {
+    if (diff) {
+        document.getElementById('stats-active').textContent  = a.active;
+        document.getElementById('stats-added').textContent   = a.added;
+        document.getElementById('stats-updated').textContent = a.updated;
+        document.getElementById('stats-removed').textContent = a.removed;
+        document.getElementById('stats-expired').textContent = a.expired;
+    }
+    else {
         if (updateStatsIntervalId) {
             clearInterval(updateStatsIntervalId);
             updateStatsIntervalId = 0;
@@ -77,7 +81,9 @@ const updateStats = (a, b) => {
 
 window.addEventListener('statsUpdateEvent', (e) => {
     newStats = e.detail.stats;
-    updateStatsIntervalId = setInterval(updateStats, 33, currentStats, newStats);
+    if (updateStatsIntervalId === 0) {
+        updateStatsIntervalId = setInterval(updateStats, 33, currentStats, newStats);
+    }
 });
 
 function stripCookie(cookie, newExpiry) {
