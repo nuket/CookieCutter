@@ -8,6 +8,7 @@
 console.log('Run service-worker.js');
 
 const stats = {
+    active: 0,
     added: 0,
     updated: 0,
     removed: 0,
@@ -82,9 +83,15 @@ chrome.webRequest.onHeadersReceived.addListener((details) => {
 
 let updateStatsTimeoutId;
 
-const updateStats = (stats) => {
+const updateStats = async (stats) => {
+    let cookies = await chrome.cookies.getAll({});
+    stats.active = cookies.length;
+
     console.log(stats);
 }
+
+// Track possible cookie updates
+let lastCookie = { name: '', domain: '' };
 
 chrome.cookies.onChanged.addListener((details) => {
     console.log('chrome.cookies.onChanged');
@@ -105,21 +112,26 @@ chrome.cookies.onChanged.addListener((details) => {
 
     if (details.cause === 'overwrite' && details.removed === true) {
         // {cause: 'overwrite', cookie: {…}, removed: true}
-        stats.updated++;
+        lastCookie = details;
     }
     else
-    if (details.cause === 'expired_overwrite' && details.removed === true) {
+    if ((details.cause === 'expired_overwrite' && details.removed === true) ||
+        (details.cause === 'evicted') ||
+        (details.cause === 'expired') ) {
         // {cause: 'expired_overwrite', cookie: {…}, removed: true}
         stats.removed++;
     }
     else
     if (details.cause === 'explicit' && details.removed === false) {
         // {cause: 'explicit', cookie: {…}, removed: false}
-        stats.added++;
-    }
-    else
-    if (details.cause === 'evicted' || details.cause == 'expired') {
-        stats.removed++;
+        if (lastCookie.name === details.name && lastCookie.domain === details.domain) {
+            stats.updated++;
+        }
+        else {
+            stats.added++;
+        }
+
+        lastCookie = { name: '', domain: '' };
     }
     else {
         console.log('Unknown combination of details seen.');
