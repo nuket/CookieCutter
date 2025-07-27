@@ -140,15 +140,15 @@ chrome.cookies.onChanged.addListener((details) => {
         console.log(details);
     }
 
-    // Rate limit the updates to once every 2 seconds.
+    // Rate limit the updates to once every 500ms.
     // Since cookies are set rapidly in groups while a page is loading, we
-    // don't need to hammer the storage instance.
+    // don't want to hammer the storage instance.
     if (updateStatsTimeoutId) {
         clearTimeout(updateStatsTimeoutId);
         updateStatsTimeoutId = 0;
     }
 
-    updateStatsTimeoutId = setTimeout(updateStats, 2000, stats);
+    updateStatsTimeoutId = setTimeout(updateStats, 500, stats);
 });
 
 // var optionsTab;
