@@ -334,37 +334,39 @@ function updateTable(data) {
     // chrome.cookies.onChanged.removeListener(listener);
 // }
 
-function updateLiveTracker() {    
+function updateLiveTracker() {
     var liveTracker=$('#liveMonitor');
-    
-    
+
+
 }
 
 function main() {
-
     // Configure log levels.
     Logger.useDefaults();
     Logger.setLevel(Logger.WARN);
-    
+
     trackerLogger.setLevel(Logger.DEBUG);
-    
+
+    trackerLogger.info('Ok go');
+
+    debugger;
 
     // Timeline Stuff.
-    
+
     // The live tracker updates itself at 30Hz.
-    liveTrackerInterval = setInterval(updateLiveTracker, 33);
+    // liveTrackerInterval = setInterval(updateLiveTracker, 33);
 
-    // Read all timeline data from LocalStorage.
-    chrome.storage.local.get(null, function(item) {
-        allData = _.values(item);
+    // // Read all timeline data from LocalStorage.
+    // chrome.storage.local.get(null, function(item) {
+    //     allData = _.values(item);
 
-        // Callback soup begins.
-        // timelineGenerator('svg#liveTimeline', _.sortBy(_.filter(allData, { 'type': 'timestamp', 'topFrame': true }), 'start'));
+    //     // Callback soup begins.
+    //     // timelineGenerator('svg#liveTimeline', _.sortBy(_.filter(allData, { 'type': 'timestamp', 'topFrame': true }), 'start'));
 
-        // updateSubframeLoads('svg#liveTimeline', _.sortBy(_.filter(allData, { 'type': 'timestamp', 'topFrame': false }), 'start'));
+    //     // updateSubframeLoads('svg#liveTimeline', _.sortBy(_.filter(allData, { 'type': 'timestamp', 'topFrame': false }), 'start'));
 
-        updateTable(_.sortBy(_.filter(allData, { 'type': 'pageLoad', 'topFrame': true }), 'start'));
-    });
+    //     updateTable(_.sortBy(_.filter(allData, { 'type': 'pageLoad', 'topFrame': true }), 'start'));
+    // });
 
     // Register for update event messages from the CookieMonitor extension.
     //

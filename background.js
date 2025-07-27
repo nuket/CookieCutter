@@ -1,19 +1,30 @@
 //
-// Copyright (c) 2014 Max Vilimpoc. All rights reserved.
+// Copyright (c) 2014 - 2025 Max Vilimpoc. All rights reserved.
 //
 // This code tracks the handful of points where cookies may be sent or received,
 // and tracks the amount of time a single page in a tab takes to load. It also
-// keeps track of how long a particular page has been open in a tab, so that 
+// keeps track of how long a particular page has been open in a tab, so that
 // cookie operations associated with a tab, can be associated with the page that
 // caused them.
 //
 
 "use strict";
 
+// import './libs/logger.js';
+// importScripts('./libs/logger.min.js');
+// import * as Logger from './libs/logger.min.js';
+// import './libs/logger.js';
+
 /**
  * Defined just for WebStorm to not keep asking.
  */
 var chrome = chrome || {};
+
+const hello = "hello world";
+
+export {
+    hello
+};
 
 /**
  * Tracking table for in-flight page loads.
@@ -54,12 +65,11 @@ var pageViewTable = {};
  */
 var pageLoadCount = 0;
 
-
-var webnavLogger = Logger.get('webnav');
-var webreqLogger = Logger.get('webreq');
-var cookieLogger = Logger.get('cookie');
-var stampsLogger = Logger.get('stamps');
-
+// const webnavLogger = Logger.get('webnav');
+// const webreqLogger = Logger.get('webreq');
+// const cookieLogger = Logger.get('cookie');
+// const stampsLogger = Logger.get('stamps');
+// const othersLogger = Logger.get('others');
 
 var makeKey = function(tabId, processId, frameId) {
     return tabId + "-" + processId + "-" + frameId;
@@ -120,7 +130,7 @@ var stampStart = function(details) {
         hostname: new URL(details.url).hostname,
         pageUrl: details.url };
 
-    stampsLogger.debug('key: ' + key + " = " + JSON.stringify(inFlight[key]));
+    // stampsLogger.debug('key: ' + key + " = " + JSON.stringify(inFlight[key]));
 };
 
 var stampFinish = function(details) {
@@ -143,7 +153,7 @@ var stampFinish = function(details) {
         // Persist the record to LocalStorage, using a timestamp as the key (irrelevant).
         storeStamp[stamp.finish] = stamp;
         chrome.storage.local.set(storeStamp, function() {
-            stampsLogger.debug("Saved timestamp data.");
+            // stampsLogger.debug("Saved timestamp data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
         });
 
@@ -151,7 +161,7 @@ var stampFinish = function(details) {
         delete inFlight[key];
     }
 
-    stampsLogger.debug('key: ' + key + " = " + JSON.stringify(stamp));
+    // stampsLogger.debug('key: ' + key + " = " + JSON.stringify(stamp));
 };
 
 function updatePageViewDetails(details) {
@@ -171,7 +181,7 @@ function updatePageViewDetails(details) {
     // info to the tracking table.
     var stamp;
     var storeStamp = {};
-    
+
     var timeMs = new Date().getTime();
 
     if (details.tabId in pageViewTable) {
@@ -181,7 +191,7 @@ function updatePageViewDetails(details) {
         // Save the stamp into Local Storage.
         storeStamp[timeMs] = stamp;
         chrome.storage.local.set(storeStamp, function() {
-            stampsLogger.debug("Saved page view duration data.");
+            // stampsLogger.debug("Saved page view duration data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
         });
     }
@@ -210,20 +220,20 @@ function updatePageViewDetails(details) {
 //};
 
 chrome.webNavigation.onCommitted.addListener(function(details) {
-    webnavLogger.debug("onCommitted " + JSON.stringify(details));
+    // webnavLogger.debug("onCommitted " + JSON.stringify(details));
 
     stampStart(details);
     updatePageViewDetails(details);
 });
 
 chrome.webNavigation.onCompleted.addListener(function(details) {
-    webnavLogger.debug("onCompleted " + JSON.stringify(details));
+    // webnavLogger.debug("onCompleted " + JSON.stringify(details));
 
     stampFinish(details);
 });
 
 chrome.webNavigation.onErrorOccurred.addListener(function(details) {
-    webnavLogger.debug("onErrorOccurred " + JSON.stringify(details));
+    // webnavLogger.debug("onErrorOccurred " + JSON.stringify(details));
 
     stampFinish(details);
 });
@@ -238,11 +248,11 @@ var standardFilter = {
 };
 
 chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
-    webreqLogger.debug("onBeforeSendHeaders " + JSON.stringify(details));
+    // webreqLogger.debug("onBeforeSendHeaders " + JSON.stringify(details));
 }, standardFilter, ['requestHeaders']);
 
 chrome.webRequest.onSendHeaders.addListener(function(details) {
-    webreqLogger.debug("onSendHeaders " + JSON.stringify(details));
+    // webreqLogger.debug("onSendHeaders " + JSON.stringify(details));
 
     // If the current request had a "Cookie" header, then
     // make a note that a cookie was sent.
@@ -257,7 +267,7 @@ chrome.webRequest.onSendHeaders.addListener(function(details) {
     if (details.tabId in pageViewTable) {
         currentPage = pageViewTable[details.tabId];
 
-        webreqLogger.debug("Existing page " + JSON.stringify(currentPage));
+        // webreqLogger.debug("Existing page " + JSON.stringify(currentPage));
 
         // Add an entry to Local Storage associating the current Cookie
         // request to the Page currently in the Tab.
@@ -275,18 +285,18 @@ chrome.webRequest.onSendHeaders.addListener(function(details) {
             cookiesPresent: cookiesPresent };
 
         chrome.storage.local.set(storeStamp, function() {
-            stampsLogger.debug("Saved cookieSent data.");
+            // stampsLogger.debug("Saved cookieSent data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
         });
     }
 }, standardFilter, ['requestHeaders']);
 
 chrome.webRequest.onHeadersReceived.addListener(function(details) {
-    webreqLogger.debug("onHeadersReceived " + JSON.stringify(details));
+    // webreqLogger.debug("onHeadersReceived " + JSON.stringify(details));
 
     // If the current request had a "Set-cookie" header, then
     // make a note that a cookie was received.
-    
+
     // var cookiePresent = _.find(details.responseHeaders, {'name': 'Set-Cookie'});
     var cookiesPresent = _.filter(details.responseHeaders, function(header) {
         return header.name.match(/set\-cookie/i);
@@ -296,11 +306,14 @@ chrome.webRequest.onHeadersReceived.addListener(function(details) {
     // Immediate check and return.
     if (!cookiesPresent || 0 == cookiesPresent.length) return;
 
+    // Note that cookie was received, action icon should update to
+    // reflect this.
+
     // Look up the current Page in the Tab that is loading.
     if (details.tabId in pageViewTable) {
         currentPage = pageViewTable[details.tabId];
 
-        webreqLogger.debug("Existing page " + JSON.stringify(currentPage));
+        // webreqLogger.debug("Existing page " + JSON.stringify(currentPage));
 
         // Add an entry to Local Storage associating the current Cookie
         // request to the Page currently in the Tab.
@@ -318,14 +331,18 @@ chrome.webRequest.onHeadersReceived.addListener(function(details) {
             cookiesPresent: cookiesPresent };
 
         chrome.storage.local.set(storeStamp, function() {
-            stampsLogger.debug("Saved cookieReceived data.");
+            // stampsLogger.debug("Saved cookieReceived data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
         });
     }
 }, standardFilter, ['responseHeaders']);
 
+chrome.webRequest.onResponseStarted.addListener(function(details) {
+    // webreqLogger.debug("onResponseStarted " + JSON.stringify(details));
+}, standardFilter, ['responseHeaders']);
+
 chrome.webRequest.onCompleted.addListener(function(details) {
-    webreqLogger.debug("onCompleted " + JSON.stringify(details));
+    // webreqLogger.debug("onCompleted " + JSON.stringify(details));
 }, standardFilter, ['responseHeaders']);
 
 
@@ -338,7 +355,7 @@ chrome.tabs.onRemoved.addListener(function(tabId, removeInfo) {
     var timeMs = new Date().getTime();
     var stamp;
     var storeStamp = {};
-    
+
     // Look up the pageView object, and mark its finished timestamp.
     if (tabId in pageViewTable) {
         stamp = pageViewTable[tabId];
@@ -347,10 +364,10 @@ chrome.tabs.onRemoved.addListener(function(tabId, removeInfo) {
         // Save the stamp into Local Storage.
         storeStamp[timeMs] = stamp;
         chrome.storage.local.set(storeStamp, function() {
-            stampsLogger.debug("Tab removed: Saved page view duration data.");
+            // stampsLogger.debug("Tab removed: Saved page view duration data.");
             if (chrome.runtime.lastError) console.log(chrome.runtime.lastError);
         });
-        
+
         // Remove the object from the pageViewTable, otherwise it's a leak.
         delete pageViewTable[tabId];
     }
@@ -408,7 +425,7 @@ chrome.browserAction.onClicked.addListener(function(tab) {
  * Debugging Stuff.
  ****************************************************************************/
 
- 
+
 function clearLocalStorage() {
     chrome.storage.local.clear();
 }
@@ -420,8 +437,8 @@ function dumpLocalStorage() {
 }
 
 function sizeLocalStorage() {
-    chrome.storage.local.getBytesInUse(null, function(data) { 
-        console.log(data); 
+    chrome.storage.local.getBytesInUse(null, function(data) {
+        console.log(data);
     });
 }
 
@@ -429,14 +446,18 @@ function sizeLocalStorage() {
  * main()
  ****************************************************************************/
 
-
 (function main() {
-    Logger.useDefaults();
-    Logger.setLevel(Logger.WARN);
+    console.log('Start background.js');
 
-    webnavLogger.setLevel(Logger.WARN);
-    webreqLogger.setLevel(Logger.WARN);
-    cookieLogger.setLevel(Logger.WARN);
-    stampsLogger.setLevel(Logger.DEBUG);
+    debugger;
+
+    console.log('Next statement');
+
+    // Logger.useDefaults();
+    // Logger.setLevel(Logger.WARN);
+
+    // webnavLogger.setLevel(Logger.WARN);
+    // webreqLogger.setLevel(Logger.DEBUG);
+    // cookieLogger.setLevel(Logger.WARN);
+    // stampsLogger.setLevel(Logger.DEBUG);
 })();
-
