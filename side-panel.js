@@ -1,3 +1,8 @@
+// --------------------------------------------------------------------------
+// CookieMonitor
+// Copyright (c) 2025 Max Vilimpoc, all rights reserved
+// --------------------------------------------------------------------------
+
 'use strict';
 
 console.log('Run side-panel.js');
@@ -18,6 +23,31 @@ console.log('Run side-panel.js');
 
 //     return out;
 // }
+
+const slider = document.getElementById('customSlider');
+const valueDisplay = document.getElementById('value');
+const customSteps = [5, 60, 6 * 60, 12 * 60, 24 * 60, 2 * 24 * 60, 3 * 24 * 60];
+
+slider.addEventListener('input', function() {
+    const index = Math.round(this.value / (this.max / (customSteps.length - 1)));
+    this.value = customSteps[index];
+    valueDisplay.textContent = this.value;
+});
+
+const pizzaEvent = new CustomEvent("pizzaDelivery", {
+  detail: {
+    name: "supreme",
+  },
+});
+
+// const pizzaStore = document.querySelector('#pizza-store');
+// pizzaStore.addEventListener("pizzaDelivery", (e) => console.log(e.detail.name));
+// pizzaStore.dispatchEvent(pizzaEvent);
+
+window.addEventListener('pizzaDelivery', (e) => console.log(e.detail.name));
+window.dispatchEvent(pizzaEvent);
+
+
 
 function stripCookie(cookie, newExpiry) {
     const protocol = cookie.secure ? 'https:' : 'http:';

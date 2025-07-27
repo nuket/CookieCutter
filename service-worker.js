@@ -5,33 +5,27 @@
 
 'use strict';
 
-// console.log('Start background.js');
+console.log('Run service-worker.js');
 
-// debugger;
-
-// console.log('Next statement');
-
-// Logger.useDefaults();
-// Logger.setLevel(Logger.WARN);
-
-// webnavLogger.setLevel(Logger.WARN);
-// webreqLogger.setLevel(Logger.DEBUG);
-// cookieLogger.setLevel(Logger.WARN);
-// stampsLogger.setLevel(Logger.DEBUG);
-
-console.log('Start service-worker.js');
-
-// debugger;
+const stats = {
+    added: 0,
+    updated: 0,
+    removed: 0,
+    expired: 0
+};
 
 chrome.sidePanel
 .setPanelBehavior({ openPanelOnActionClick: true })
 .catch((error) => console.error(error));
 
 // import { hello } from './background.js'
-
 // console.log(hello);
 
 // debugger;
+
+// --------------------------------------------------------------------------
+// chrome.webNavigation
+// --------------------------------------------------------------------------
 
 // onBeforeNavigate -> onCommitted -> [onDOMContentLoaded] -> onCompleted
 
@@ -56,10 +50,9 @@ chrome.webNavigation.onCompleted.addListener((details) => {
     console.log(details);
 });
 
-// chrome.webRequest.onCompleted.addListener((details) => {
-    //     console.log(details);
-// }, { urls: ['<all_urls>'] }, ['blocking']
-// );
+// --------------------------------------------------------------------------
+// chrome.webRequest
+// --------------------------------------------------------------------------
 
 chrome.webRequest.onBeforeSendHeaders.addListener((details) => {
     console.log('chrome.webRequest.onBeforeSendHeaders');
@@ -71,6 +64,11 @@ chrome.webRequest.onHeadersReceived.addListener((details) => {
     console.log(details);
 }, {urls:['<all_urls>']}, ['extraHeaders', 'responseHeaders']);
 
+// chrome.webRequest.onCompleted.addListener((details) => {
+    //     console.log(details);
+// }, { urls: ['<all_urls>'] }, ['blocking']
+// );
+
 // chrome.browserAction.onClicked.addListener(function (tab) {
 //     chrome.tabs.create({
 //         url: chrome.extension.getURL('manager.html'),
@@ -80,33 +78,59 @@ chrome.webRequest.onHeadersReceived.addListener((details) => {
 
 chrome.cookies.onChanged.addListener((details) => {
     console.log('chrome.cookies.onChanged');
-    console.log(details);
 
+    // https://developer.chrome.com/docs/extensions/reference/api/cookies#type-OnChangedCause
+    // The underlying reason behind the cookie's change.
+    // If a cookie was inserted, or removed via an explicit call to "chrome.cookies.remove", "cause" will be "explicit".
+    // If a cookie was automatically removed due to expiry, "cause" will be "expired".
+    // If a cookie was removed due to being overwritten with an already-expired expiration date, "cause" will be set to "expired_overwrite".
+    // If a cookie was automatically removed due to garbage collection, "cause" will be "evicted".
+    // If a cookie was automatically removed due to a "set" call that overwrote it, "cause" will be "overwrite".
+    // Plan your response accordingly.
+    // "evicted"
+    // "expired"
+    // "explicit"
+    // "expired_overwrite"
+    // "overwrite"
 
+    if (details.cause === 'overwrite' && details.removed === true) {
+        // {cause: 'overwrite', cookie: {…}, removed: true}
+        stats.updated++;
+    }
+    else
+    if (details.cause === 'expired_overwrite' && details.removed === true) {
+        // {cause: 'expired_overwrite', cookie: {…}, removed: true}
+        stats.removed++;
+    }
+    else
+    if (details.cause === 'explicit' && details.removed === false) {
+        // {cause: 'explicit', cookie: {…}, removed: false}
+        stats.added++;
+    }
+    else
+    if (details.cause === 'evicted' || details.cause == 'expired') {
+        stats.removed++;
+    }
+    else {
+        console.log('Unknown combination of details seen.');
+        console.log(details);
+    }
 
+    console.log(stats);
 });
 
-var optionsTab;
+// var optionsTab;
 
-chrome.action.onClicked.addListener((tab) => {
-    // if (optionsTab) {
-    //     debugger;
-    // }
-    // else {
-        chrome.tabs.create({url: "options.html"}, (createdTab) => {
-            console.log('Tab created.');
-            console.log(createdTab);
+// chrome.action.onClicked.addListener((tab) => {
+//     // if (optionsTab) {
+//     //     debugger;
+//     // }
+//     // else {
+//         chrome.tabs.create({url: "options.html"}, (createdTab) => {
+//             console.log('Tab created.');
+//             console.log(createdTab);
 
-            optionsTab = createdTab;
-        });
-    // }
-});
-
-// "options_page": "options.html",
-// "side_panel": {
-//     "default_path": "manager.html"
-// },
-// "action": {
-//     "default_popup": "manager.html"
-// },
-
+//             optionsTab = createdTab;
+//         });
+//     // }
+// });
