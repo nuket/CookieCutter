@@ -3,42 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <style>
+        div.stat-type { font-size: 150%; }
         #customSlider { width: 100%; }
+        #histogram { width: 100%; height: 100px; background-color: #ccc; }
     </style>
 </head>
 <body>
+    <h1>Cookie Canary</h1>
+    <div class="author">by <a href="https://vilimpoc.org">Max Vilimpoc</a></div>
+
     <p>
-        As you browse the web, cookies track you from Google, Facebook, Amazon,
-        a million different ad networks, data brokers, and others.
+        As you browse the web, cookies track you from a million different places.
+        This extension lets you regularly cull cookies and set a hard expiry date for them.
+
+        <!-- Google, Facebook, Amazon, a million different ad networks, data brokers, and others. -->
     </p>
 
     <h2>Statistics</h2>
 
     <div>
-        <div>Active</div>
+        <div class="stat-type">Active</div>
         <div id="stats-active">0</div>
-        <div>Added</div>
+
+        <div class="stat-type">Added</div>
         <div id="stats-added">0</div>
-        <div>Updated</div>
+
+        <div class="stat-type">Updated</div>
         <div id="stats-updated">0</div>
-        <div>Removed</div>
+
+        <div class="stat-type">Removed</div>
         <div id="stats-removed">0</div>
-        <div>Expired</div>
+
+        <div class="stat-type">Expired</div>
         <div id="stats-expired">0</div>
     </div>
 
-    <!-- <div role="tooltip" id="stats-active-tip">
-        This is the total number of cookies currently active in the browser
-        cookie database.
-    </div> -->
+    <h2>Histogram</h2>
 
-    <!-- <h2>Faster Cookie Removal</h2>
+    <div>What are the most common expiry dates for the Active cookies?</div>
+    <!-- <div id="histogram"></div> -->
+    <div id="timebuckets"></div>
+    <button id="calculateTimebuckets">Calculate</button>
+
+    <h2>Faster Cookie Removal</h2>
 
     <p>How long should cookies be valid?</p>
 
     <p>5 minutes, 1 hour, 6 hours, 1 day, 2 days, 3 days</p>
 
-    <div>
+    <h2>Deny</h2>
+
+
+
+    <h2>Allow</h2>
+
+    <!-- <div>
         <input type="range" id="customSlider" min="5" max="4320" step="1" value="1440">
     </div>
     <p>Value: <span id="value">0</span></p>

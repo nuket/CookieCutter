@@ -158,6 +158,53 @@ async function clickGetAll(e) {
     });
 };
 
+// let timebuckets = {
+
+// };
+
+// Generate the histogram of expiration times, by streaming the cookies
+// into the algorithm.
+
+// Must use a regular function to be able to pass `this` via .map()
+function calculateOne(cookie, index, arr) {
+    // console.log(cookie);
+    // console.log(this);
+
+    // example expirationDate: 1756114587.047135
+    if (cookie.session === false) {
+        return cookie.expirationDate - this.timestamp;
+    }
+
+    return 0;
+};
+
+// const multiplier = { factor: 2 };
+// const numbers = [1, 2, 3];
+// const scaledNumbers = numbers.map(function(number) {
+//   return number * this.factor;
+// }, multiplier);
+// console.log(scaledNumbers); // Output: [2, 4, 6]
+
+const calculateAll = async () => {
+    let cookies = await chrome.cookies.getAll({});
+
+    // timestamp: 1753659415278 -> 1753659415.278 then floating point math
+    const thisArg = { timestamp: new Date().getTime() / 1000 }; // time since epoch in Seconds.ms
+
+    let expirations = cookies;
+    expirations = expirations.map(calculateOne, thisArg);
+    expirations = expirations.filter((value, index, arr) => {
+        // Remove session cookies (0's)
+        if (value) return true;
+    })
+    expirations = expirations.sort((a, b) => a - b);
+
+    console.log(expirations);
+};
+
+document.getElementById('calculateTimebuckets').addEventListener('click', calculateAll);
+
+
 // document.getElementById('getAll').addEventListener('click', clickGetAll);
 
 // // The async IIFE is necessary because Chrome <89 does not support top level await.
