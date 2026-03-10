@@ -57,11 +57,19 @@ let chartData = {};
 const CHART_BARS = 60;
 const BAR_GAP    = 1;
 
-const COLORS = {
-    added:   '#22c55e',
-    updated: '#3b82f6',
-    removed: '#ef4444',
-};
+const COLORS = { added: '', updated: '', removed: '', grid: '', marker: '' };
+
+function syncColors() {
+    const s = getComputedStyle(document.documentElement);
+    COLORS.added   = s.getPropertyValue('--green').trim();
+    COLORS.updated = s.getPropertyValue('--blue').trim();
+    COLORS.removed = s.getPropertyValue('--red').trim();
+    COLORS.grid    = s.getPropertyValue('--chart-grid').trim();
+    COLORS.marker  = s.getPropertyValue('--chart-marker').trim();
+}
+
+syncColors();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncColors);
 
 const canvas  = document.getElementById('chart');
 const ctx     = canvas.getContext('2d');
@@ -99,7 +107,7 @@ function drawChart() {
     }
 
     // Draw grid lines (horizontal, at 25% / 50% / 75% of chart height).
-    ctx.strokeStyle = '#1e1e3a';
+    ctx.strokeStyle = COLORS.grid;
     ctx.lineWidth = 1;
     for (const pct of [0.25, 0.5, 0.75]) {
         const y = Math.round(H * (1 - pct));
@@ -142,7 +150,7 @@ function drawChart() {
     }
 
     // "Now" marker — subtle vertical line at the right edge.
-    ctx.strokeStyle = '#3a3a60';
+    ctx.strokeStyle = COLORS.marker;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(W - 1, 0);
