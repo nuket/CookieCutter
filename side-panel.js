@@ -232,6 +232,62 @@ function renderCookies(cookies) {
         }
     }
 
+    // Recently modified: up to 50 cookies from the most recently active domains.
+    let recentHtml = '';
+    const modifiedDomains = Object.entries(domainLastModified)
+        .sort(([, a], [, b]) => b - a);   // newest first
+
+    if (modifiedDomains.length > 0) {
+        // Pre-bucket all cookies by domain.
+        const cookiesByDomain = {};
+        for (const c of cookies) {
+            (cookiesByDomain[c.domain] = cookiesByDomain[c.domain] ?? []).push(c);
+        }
+
+        const recentDomains = [];
+        let recentTotal = 0;
+        for (const [domain, ts] of modifiedDomains) {
+            if (recentTotal >= 50) break;
+            const items = (cookiesByDomain[domain] ?? [])
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .slice(0, 50 - recentTotal);
+            if (items.length === 0) continue;
+            recentDomains.push({ domain, ts, items });
+            recentTotal += items.length;
+        }
+
+        if (recentDomains.length > 0) {
+            const outerOpen = !collapsedGroups.has('recent');
+            const subgroupsHtml = recentDomains.map(({ domain, ts, items }) => {
+                const domId   = 'recent-' + domain;
+                const domOpen = !collapsedGroups.has(domId);
+                const rows = items.map(c =>
+                    `<li class="cookie-item subitem">` +
+                    `<span class="cookie-name">${escapeHTML(c.name || '(no name)')}</span>` +
+                    `</li>`
+                ).join('');
+                return `<div class="group domain-subgroup" data-id="${escapeHTML(domId)}">` +
+                    `<button class="group-header" aria-expanded="${domOpen}">` +
+                        `<span class="group-toggle">${domOpen ? '▾' : '▸'}</span>` +
+                        `<span class="group-label">${escapeHTML(domain)}</span>` +
+                        `<span class="group-time" data-domain="${escapeHTML(domain)}">${timeAgo(ts)}</span>` +
+                        `<span class="group-count">${items.length}</span>` +
+                    `</button>` +
+                    (domOpen ? `<ul class="group-items">${rows}</ul>` : '') +
+                    `</div>`;
+            }).join('');
+
+            recentHtml = `<div class="group" data-id="recent">` +
+                `<button class="group-header" aria-expanded="${outerOpen}">` +
+                    `<span class="group-toggle">${outerOpen ? '▾' : '▸'}</span>` +
+                    `<span class="group-label">Recently Modified</span>` +
+                    `<span class="group-count">${recentTotal}</span>` +
+                `</button>` +
+                (outerOpen ? `<div class="domain-subgroups">${subgroupsHtml}</div>` : '') +
+                `</div>`;
+        }
+    }
+
     let html = GROUPS.map(g => {
         const items = buckets[g.id];
         if (items.length === 0) return '';
@@ -300,7 +356,7 @@ function renderCookies(cookies) {
             `</div>`;
     }
 
-    cookieListEl.innerHTML = html;
+    cookieListEl.innerHTML = recentHtml + html;
 
     for (const btn of cookieListEl.querySelectorAll('.group-header')) {
         btn.addEventListener('click', () => {
@@ -392,7 +448,7 @@ function tickTimeElements() {
     const nowSec = Math.floor(Date.now() / 1000);
     if (nowSec === lastTimeTick) return;
     lastTimeTick = nowSec;
-    for (const el of cookieListEl.querySelectorAll('.cookie-time[data-domain]')) {
+    for (const el of cookieListEl.querySelectorAll('[data-domain]')) {
         const ts = domainLastModified[el.dataset.domain];
         el.textContent = ts ? timeAgo(ts) : '';
     }

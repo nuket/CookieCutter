@@ -241,6 +241,13 @@ canvas {
     font-size: 9px;
 }
 
+.group-time {
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+    color: var(--dim);
+    margin-right: 4px;
+}
+
 /* Group accent colours */
 .group[data-id="week"]    .group-header { color: var(--red); }
 .group[data-id="month"]   .group-header { color: var(--amber); }
