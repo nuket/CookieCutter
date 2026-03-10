@@ -7,162 +7,142 @@
 
 console.log('Run service-worker.js');
 
-const stats = {
-    active: 0,
-    added: 0,
-    updated: 0,
-    removed: 0,
-    expired: 0
-};
+// --------------------------------------------------------------------------
+// State
+// --------------------------------------------------------------------------
+
+let stats = { active: 0, added: 0, updated: 0, removed: 0, expired: 0 };
+
+// chartData: { [secondStr]: { added, updated, removed } }
+// Keyed by Unix second string for easy serialization and gap detection.
+let chartData = {};
+
+// Pending overwrite map: tracks "overwrite+removed" events waiting for
+// the matching "explicit+added" event. key = name + "||" + domain, value = timestamp.
+const pendingOverwrites = new Map();
+const OVERWRITE_TTL_MS = 200;
+
+let debounceTimer = null;
+
+// --------------------------------------------------------------------------
+// Startup: restore persisted state
+// --------------------------------------------------------------------------
+
+let initialized = false;
+
+async function init() {
+    if (initialized) return;
+    initialized = true;
+
+    const stored = await chrome.storage.local.get(['stats', 'chartData']);
+    if (stored.stats)     Object.assign(stats, stored.stats);
+    if (stored.chartData) chartData = stored.chartData;
+
+    // Recount active cookies to correct any drift.
+    const all = await chrome.cookies.getAll({});
+    stats.active = all.length;
+    await chrome.storage.local.set({ stats, chartData });
+    console.log('Initialized:', stats);
+}
+
+init();
+
+// --------------------------------------------------------------------------
+// Side panel behavior
+// --------------------------------------------------------------------------
 
 chrome.sidePanel
-.setPanelBehavior({ openPanelOnActionClick: true })
-.catch((error) => console.error(error));
-
-// import { hello } from './background.js'
-// console.log(hello);
-
-// debugger;
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((error) => console.error(error));
 
 // --------------------------------------------------------------------------
-// chrome.webNavigation
+// Chart bucket helpers
 // --------------------------------------------------------------------------
 
-// onBeforeNavigate -> onCommitted -> [onDOMContentLoaded] -> onCompleted
+const CHART_BUCKETS = 90;
 
-chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-    console.log('chrome.webNavigation.onBeforeNavigate');
-    console.log(details);
-})
+function getBucket() {
+    const key = String(Math.floor(Date.now() / 1000));
+    if (!chartData[key]) {
+        chartData[key] = { added: 0, updated: 0, removed: 0 };
+    }
+    return chartData[key];
+}
 
-chrome.webNavigation.onCommitted.addListener((details) => {
-    console.log('chrome.webNavigation.onCommitted');
-    console.log(details);
-})
-
-chrome.webNavigation.onCompleted.addListener((details) => {
-    // chrome.notifications.create({
-    //     type: 'basic',
-    //     iconUrl: 'cookie.png',
-    //     title: 'Page Loaded',
-    //     message: `Completed loading: ${details.url} at ${details.timeStamp} milliseconds since the epoch.`
-    // });
-    console.log('chrome.webNavigation.onCompleted');
-    console.log(details);
-});
+function pruneChartData() {
+    const cutoff = Math.floor(Date.now() / 1000) - CHART_BUCKETS;
+    for (const key of Object.keys(chartData)) {
+        if (Number(key) < cutoff) delete chartData[key];
+    }
+}
 
 // --------------------------------------------------------------------------
-// chrome.webRequest
+// Debounced storage flush
 // --------------------------------------------------------------------------
 
-chrome.webRequest.onBeforeSendHeaders.addListener((details) => {
-    console.log('chrome.webRequest.onBeforeSendHeaders');
-    console.log(details);
-}, { urls: ['<all_urls>'] }, ['extraHeaders', 'requestHeaders']);
+function scheduleFlush() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(flush, 500);
+}
 
-chrome.webRequest.onHeadersReceived.addListener((details) => {
-    console.log('chrome.webRequest.onHeadersReceived');
-    console.log(details);
-}, {urls:['<all_urls>']}, ['extraHeaders', 'responseHeaders']);
-
-// chrome.webRequest.onCompleted.addListener((details) => {
-    //     console.log(details);
-// }, { urls: ['<all_urls>'] }, ['blocking']
-// );
-
-// chrome.browserAction.onClicked.addListener(function (tab) {
-//     chrome.tabs.create({
-//         url: chrome.extension.getURL('manager.html'),
-//         selected: true,
-//     })
-// })
-
-// --------------------------------------------------------------------------
-// chrome.cookies
-// --------------------------------------------------------------------------
-
-let updateStatsTimeoutId;
-
-const updateStats = async (stats) => {
-    let cookies = await chrome.cookies.getAll({});
-    stats.active = cookies.length;
-
-    chrome.storage.local.set({ stats: stats });
-
+async function flush() {
+    debounceTimer = null;
+    pruneChartData();
+    const all = await chrome.cookies.getAll({});
+    stats.active = all.length;
+    await chrome.storage.local.set({ stats, chartData });
     console.log(stats);
 }
 
-// Track possible cookie updates
-let lastCookie = { name: '', domain: '' };
+// --------------------------------------------------------------------------
+// Cookie change listener
+// --------------------------------------------------------------------------
 
 chrome.cookies.onChanged.addListener((details) => {
-    console.log('chrome.cookies.onChanged');
+    if (!initialized) return;
 
-    // https://developer.chrome.com/docs/extensions/reference/api/cookies#type-OnChangedCause
-    // The underlying reason behind the cookie's change.
-    // If a cookie was inserted, or removed via an explicit call to "chrome.cookies.remove", "cause" will be "explicit".
-    // If a cookie was automatically removed due to expiry, "cause" will be "expired".
-    // If a cookie was removed due to being overwritten with an already-expired expiration date, "cause" will be set to "expired_overwrite".
-    // If a cookie was automatically removed due to garbage collection, "cause" will be "evicted".
-    // If a cookie was automatically removed due to a "set" call that overwrote it, "cause" will be "overwrite".
-    // Plan your response accordingly.
-    // "evicted"
-    // "expired"
-    // "explicit"
-    // "expired_overwrite"
-    // "overwrite"
+    const { cause, removed, cookie } = details;
+    const overwriteKey = cookie.name + '||' + cookie.domain;
+    const now = Date.now();
 
-    if (details.cause === 'overwrite' && details.removed === true) {
-        // {cause: 'overwrite', cookie: {…}, removed: true}
-        lastCookie = details;
+    // Evict stale pending overwrite entries.
+    for (const [k, ts] of pendingOverwrites) {
+        if (now - ts > OVERWRITE_TTL_MS) pendingOverwrites.delete(k);
     }
-    else
-    if ((details.cause === 'expired_overwrite' && details.removed === true) ||
-        (details.cause === 'evicted') ||
-        (details.cause === 'expired') ) {
-        // {cause: 'expired_overwrite', cookie: {…}, removed: true}
-        stats.removed++;
+
+    const bucket = getBucket();
+
+    if (cause === 'overwrite' && removed === true) {
+        // First half of an update: old cookie being displaced.
+        pendingOverwrites.set(overwriteKey, now);
     }
-    else
-    if (details.cause === 'explicit' && details.removed === false) {
-        // {cause: 'explicit', cookie: {…}, removed: false}
-        if (lastCookie.name === details.name && lastCookie.domain === details.domain) {
+    else if (cause === 'explicit' && removed === false) {
+        // Either a new cookie or the second half of an update.
+        if (pendingOverwrites.has(overwriteKey)) {
+            pendingOverwrites.delete(overwriteKey);
             stats.updated++;
-        }
-        else {
+            bucket.updated++;
+        } else {
             stats.added++;
+            bucket.added++;
         }
-
-        lastCookie = { name: '', domain: '' };
+    }
+    else if (cause === 'explicit' && removed === true) {
+        stats.removed++;
+        bucket.removed++;
+    }
+    else if (cause === 'expired' || cause === 'expired_overwrite') {
+        stats.removed++;
+        stats.expired++;
+        bucket.removed++;
+    }
+    else if (cause === 'evicted') {
+        stats.removed++;
+        bucket.removed++;
     }
     else {
-        console.log('Unknown combination of details seen.');
-        console.log(details);
+        console.log('Unhandled cookie change:', details);
     }
 
-    // Rate limit the updates to once every 500ms.
-    // Since cookies are set rapidly in groups while a page is loading, we
-    // don't want to hammer the storage instance.
-    if (updateStatsTimeoutId) {
-        clearTimeout(updateStatsTimeoutId);
-        updateStatsTimeoutId = 0;
-    }
-
-    updateStatsTimeoutId = setTimeout(updateStats, 500, stats);
+    scheduleFlush();
 });
-
-// var optionsTab;
-
-// chrome.action.onClicked.addListener((tab) => {
-//     // if (optionsTab) {
-//     //     debugger;
-//     // }
-//     // else {
-//         chrome.tabs.create({url: "options.html"}, (createdTab) => {
-//             console.log('Tab created.');
-//             console.log(createdTab);
-
-//             optionsTab = createdTab;
-//         });
-//     // }
-// });

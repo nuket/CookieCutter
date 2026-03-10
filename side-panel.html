@@ -1,142 +1,53 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <style>
-        body {
-            font-family: system-ui, sans-serif;
-            margin: 0;
-            padding: 12px 16px;
-            background: #f5f5f5;
-            color: #222;
-        }
-        h1 { font-size: 1.2rem; margin: 0 0 2px; }
-        .author { font-size: 0.75rem; color: #888; margin-bottom: 14px; }
-        .author a { color: #888; }
-        h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin: 18px 0 8px; }
-        #stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-        .stat-card {
-            background: #fff;
-            border-radius: 8px;
-            padding: 10px 14px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        }
-        .stat-card.wide {
-            grid-column: 1 / -1;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .stat-label {
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #999;
-            margin-bottom: 4px;
-        }
-        .stat-value {
-            font-size: 1.6rem;
-            font-weight: 600;
-            color: #222;
-            line-height: 1;
-        }
-        .stat-card.wide .stat-label { margin-bottom: 0; margin-right: 12px; }
-        .stat-card.wide .stat-value { font-size: 2rem; color: #1a73e8; }
-        #customSlider { width: 100%; }
-        #histogram { width: 100%; height: 100px; background-color: #ccc; }
-        button {
-            margin-top: 6px;
-            padding: 6px 14px;
-            font-size: 0.8rem;
-            border: none;
-            border-radius: 6px;
-            background: #1a73e8;
-            color: #fff;
-            cursor: pointer;
-        }
-        button:hover { background: #1558b0; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cookie Canary</title>
+    <link rel="stylesheet" href="side-panel.css">
 </head>
 <body>
-    <h1>Cookie Monitor</h1>
-    <div class="author">by <a href="https://vilimpoc.org">Max Vilimpoc</a></div>
+    <header>
+        <h1>Cookie Cutter</h1>
+    </header>
 
-    <p>
-        As you browse the web, cookies track you from a million different places.
-        This extension lets you regularly cull cookies and set a hard expiry date for them.
-
-        <!-- Google, Facebook, Amazon, a million different ad networks, data brokers, and others. -->
-    </p>
-
-    <h2>Statistics</h2>
-
-    <div id="stats-grid">
-        <div class="stat-card wide">
-            <div class="stat-label">Active</div>
-            <div id="stats-active" class="stat-value">0</div>
+    <section class="stats-row">
+        <div class="stat" id="stat-active">
+            <span class="stat-value" id="val-active">0</span>
+            <span class="stat-label">Active</span>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Added</div>
-            <div id="stats-added" class="stat-value">0</div>
+        <div class="stat" id="stat-added">
+            <span class="stat-value" id="val-added">0</span>
+            <span class="stat-label">Added</span>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Updated</div>
-            <div id="stats-updated" class="stat-value">0</div>
+        <div class="stat" id="stat-updated">
+            <span class="stat-value" id="val-updated">0</span>
+            <span class="stat-label">Updated</span>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Removed</div>
-            <div id="stats-removed" class="stat-value">0</div>
+        <div class="stat" id="stat-removed">
+            <span class="stat-value" id="val-removed">0</span>
+            <span class="stat-label">Removed</span>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Expired</div>
-            <div id="stats-expired" class="stat-value">0</div>
+        <div class="stat" id="stat-expired">
+            <span class="stat-value" id="val-expired">0</span>
+            <span class="stat-label">Expired</span>
         </div>
-    </div>
+    </section>
 
-    <h2>Histogram</h2>
+    <section class="chart-section">
+        <canvas id="chart"></canvas>
+    </section>
 
-    <div>What are the most common expiry dates for the Active cookies?</div>
-    <!-- <div id="histogram"></div> -->
-    <div id="timebuckets"></div>
-    <button id="calculateTimebuckets">Calculate</button>
+    <section class="legend">
+        <span class="legend-item added">Added</span>
+        <span class="legend-item updated">Updated</span>
+        <span class="legend-item removed">Removed</span>
+    </section>
 
-    <h2>Faster Cookie Removal</h2>
-
-    <p>How long should cookies be valid?</p>
-
-    <p>5 minutes, 1 hour, 6 hours, 1 day, 2 days, 3 days</p>
-
-    <h2>Deny</h2>
-
-
-
-    <h2>Allow</h2>
-
-    <!-- <div>
-        <input type="range" id="customSlider" min="5" max="4320" step="1" value="1440">
-    </div>
-    <p>Value: <span id="value">0</span></p>
-
-    <p>When was the last time a cookie was updated?</p>
-
-    <button id="getAll">Get All</button>
-
-    <p>These domains are allowed to have long-duration cookies.</p>
-
-    <textarea id="allow"></textarea>
-
-    <p>These domains are force to have short-duration cookies.</p>
-
-    <p>These domains are not allowed to set cookies.</p>
-
-    <textarea id="deny"></textarea> -->
+    <footer class="author">
+        by <a href="https://vilimpoc.org">Max Vilimpoc</a>
+    </footer>
 
     <script src="side-panel.js" type="module"></script>
-
-    <!-- Made with ❤️ <a href="https://vilimpoc.org">in Berlin</a> -->
 </body>
 </html>

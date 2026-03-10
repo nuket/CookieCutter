@@ -7,276 +7,207 @@
 
 console.log('Run side-panel.js');
 
-// // Filter out properties that chrome.cookies.set() does not like.
-// function cookieDetails(cookie) {
-//     const details = ['domain', 'expirationDate', 'httpOnly', 'name', 'partitionKey', 'path', 'sameSite', 'secure', 'storeId', 'url', 'value'];
+// --------------------------------------------------------------------------
+// Stats counters
+// --------------------------------------------------------------------------
 
-//     let out = {};
-//     details.forEach(detail => {
-    //         if (cookie[detail]) out[detail] = cookie[detail];
-//     });
+const displayed = { active: 0, added: 0, updated: 0, removed: 0, expired: 0 };
+const target    = { active: 0, added: 0, updated: 0, removed: 0, expired: 0 };
 
-//     const protocol = cookie.secure ? 'https:' : 'http:';
-//     out['url'] = `${protocol}//${cookie.domain}${cookie.path}`;
-
-//     console.log(out['url']);
-
-//     return out;
-// }
-
-// const slider = document.getElementById('customSlider');
-// const valueDisplay = document.getElementById('value');
-// const customSteps = [5, 60, 6 * 60, 12 * 60, 24 * 60, 2 * 24 * 60, 3 * 24 * 60];
-
-// slider.addEventListener('input', function() {
-//     const index = Math.round(this.value / (this.max / (customSteps.length - 1)));
-//     this.value = customSteps[index];
-//     valueDisplay.textContent = this.value;
-// });
-
-let currentStats = {
-    active: 0,
-    added: 0,
-    updated: 0,
-    removed: 0,
-    expired: 0
+const valEls = {
+    active:  document.getElementById('val-active'),
+    added:   document.getElementById('val-added'),
+    updated: document.getElementById('val-updated'),
+    removed: document.getElementById('val-removed'),
+    expired: document.getElementById('val-expired'),
 };
 
-let newStats = {
-    active: 0,
-    added: 0,
-    updated: 0,
-    removed: 0,
-    expired: 0
-};
-
-let updateStatsIntervalId = 0;
-
-const updateStats = (a, b) => {
-    let diff = 0;
-
-    // active is the only field that can decrement
-    if      (a.active  < b.active)  { diff++; a.active++;  }
-    else if (a.active  > b.active)  { diff++; a.active--;  }
-
-    if (a.added   < b.added)   { diff++; a.added++;   }
-    if (a.updated < b.updated) { diff++; a.updated++; }
-    if (a.removed < b.removed) { diff++; a.removed++; }
-    if (a.expired < b.expired) { diff++; a.expired++; }
-
-    if (diff) {
-        document.getElementById('stats-active').textContent  = a.active;
-        document.getElementById('stats-added').textContent   = a.added;
-        document.getElementById('stats-updated').textContent = a.updated;
-        document.getElementById('stats-removed').textContent = a.removed;
-        document.getElementById('stats-expired').textContent = a.expired;
+function updateDOM() {
+    for (const key of Object.keys(displayed)) {
+        valEls[key].textContent = displayed[key].toLocaleString();
     }
-    else {
-        if (updateStatsIntervalId) {
-            clearInterval(updateStatsIntervalId);
-            updateStatsIntervalId = 0;
-        }
-    }
-};
-
-window.addEventListener('statsUpdateEvent', (e) => {
-    newStats = e.detail.stats;
-    if (updateStatsIntervalId === 0) {
-        updateStatsIntervalId = setInterval(updateStats, 33, currentStats, newStats);
-    }
-});
-
-function stripCookie(cookie, newExpiry) {
-    const protocol = cookie.secure ? 'https:' : 'http:';
-    const domain = (String(cookie.domain).startsWith('.')) ? String(cookie.domain).substring(1) : cookie.domain;
-
-    const url = `${protocol}//${domain}${cookie.path}`;
-
-    // domain: cookie.domain,
-    return {
-        url: url,
-        name: cookie.name,
-        expirationDate: newExpiry,
-        storeId: cookie.storeId
-    };
 }
 
-async function clickGetAll(e) {
-    console.log(e);
+// Step displayed counters toward target, returning true if any changed.
+function stepCounters() {
+    let changed = false;
+    for (const key of Object.keys(displayed)) {
+        const gap = target[key] - displayed[key];
+        if (gap === 0) continue;
+        const step = gap > 0
+            ? Math.max(1, Math.ceil(gap / 8))
+            : Math.min(-1, Math.floor(gap / 8));
+        displayed[key] += step;
+        // Clamp to target to avoid overshoot.
+        displayed[key] = gap > 0
+            ? Math.min(displayed[key], target[key])
+            : Math.max(displayed[key], target[key]);
+        changed = true;
+    }
+    return changed;
+}
 
-    let all = await chrome.cookies.getAll({});
-    let stored = all.filter(cookie => cookie.session === false);
+// --------------------------------------------------------------------------
+// Chart
+// --------------------------------------------------------------------------
 
-    console.log(all);
-    console.log(stored);
+// chartData: { [secondStr]: { added, updated, removed } }
+let chartData = {};
 
-    let now = new Date().getTime(); // time since epoch in ms
+const CHART_BARS = 60;
+const BAR_GAP    = 1;
 
-    console.log(now);
-    console.log(stored[0].expirationDate * 1000);
-    console.log(stored[0].expirationDate * 1000 - now);
-
-    stored.forEach(async cookie => {
-        const remainingMs = Math.ceil(cookie.expirationDate * 1000 - now);
-        const threeDaysMs = 3 * 86400 * 1000;
-        const newExpirationDateSeconds = (now + threeDaysMs) / 1000;
-
-        if (remainingMs > threeDaysMs) {
-            console.log(`cookie expires more than 3 days from now: ${remainingMs} ms`);
-            // console.log(cookie["expirationDate"]);
-
-            // Rewrite cookie to expire in 3 days.
-            // cookie.set({expirationDate: newExpirationDateSeconds});
-            // cookie["expirationDate"] = newExpirationDateSeconds;
-            // console.log(cookie["expirationDate"]);
-
-            // const newCookie = copyCookie(cookie, newExpirationDateSeconds);
-            let newCookie = stripCookie(cookie, newExpirationDateSeconds);
-            console.log(newCookie);
-
-            // await chrome.cookies.remove(newCookie);
-            try {
-                await chrome.cookies.set(newCookie);
-            }
-            catch {
-                console.log('could not set');
-                console.log(cookie);
-                console.log(newCookie);
-            }
-        }
-    });
-
-    stored.forEach(async cookie => {
-        try {
-            if (cookie.domain.contains('bing.com')) {
-                console.log('Cookie from bing.com');
-            }
-        }
-        catch {
-            console.log('Ok')
-        }
-    });
+const COLORS = {
+    added:   '#22c55e',
+    updated: '#3b82f6',
+    removed: '#ef4444',
 };
 
-// let timebuckets = {
+const canvas  = document.getElementById('chart');
+const ctx     = canvas.getContext('2d');
+let canvasW   = 0;
+let canvasH   = 0;
 
-// };
+function drawChart() {
+    if (canvasW === 0 || canvasH === 0) return;
 
-// Generate the histogram of expiration times, by streaming the cookies
-// into the algorithm.
+    const W = canvasW;
+    const H = canvasH;
 
-// Must use a regular function to be able to pass `this` via .map()
-function calculateOne(cookie, index, arr) {
-    // console.log(cookie);
-    // console.log(this);
+    // Clear to background colour.
+    ctx.clearRect(0, 0, W, H);
 
-    // example expirationDate: 1756114587.047135
-    if (cookie.session === false) {
-        return cookie.expirationDate - this.timestamp;
+    const nowMs    = Date.now();
+    const nowSec   = Math.floor(nowMs / 1000);
+    const fraction = (nowMs % 1000) / 1000;
+
+    // Bar width distributes evenly across the canvas.
+    const bw = (W - BAR_GAP * (CHART_BARS - 1)) / CHART_BARS;
+
+    // Build visible bucket array: index 0 = newest, index 59 = oldest.
+    const buckets = [];
+    for (let i = 0; i < CHART_BARS; i++) {
+        const key = String(nowSec - i);
+        buckets.push(chartData[key] ?? { added: 0, updated: 0, removed: 0 });
     }
 
-    return 0;
-};
+    // Find the maximum combined value for y-scaling.
+    let maxTotal = 1;
+    for (const b of buckets) {
+        const t = b.added + b.updated + b.removed;
+        if (t > maxTotal) maxTotal = t;
+    }
 
-// const multiplier = { factor: 2 };
-// const numbers = [1, 2, 3];
-// const scaledNumbers = numbers.map(function(number) {
-//   return number * this.factor;
-// }, multiplier);
-// console.log(scaledNumbers); // Output: [2, 4, 6]
+    // Draw grid lines (horizontal, at 25% / 50% / 75% of chart height).
+    ctx.strokeStyle = '#1e1e3a';
+    ctx.lineWidth = 1;
+    for (const pct of [0.25, 0.5, 0.75]) {
+        const y = Math.round(H * (1 - pct));
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+    }
 
-const calculateAll = async () => {
-    let cookies = await chrome.cookies.getAll({});
+    // Draw bars: i=0 is newest (rightmost), i=59 is oldest (leftmost).
+    // Smooth-scroll formula: as `fraction` goes 0→1, bars shift one
+    // full bar-slot to the left, then a new bar snaps in at the right.
+    for (let i = 0; i < CHART_BARS; i++) {
+        const x = W - (fraction + i + 1) * (bw + BAR_GAP);
+        if (x + bw < 0) break;   // remaining bars are off the left edge
+        if (x > W)      continue; // bar is off the right edge
 
-    // timestamp: 1753659415278 -> 1753659415.278 then floating point math
-    const thisArg = { timestamp: new Date().getTime() / 1000 }; // time since epoch in Seconds.ms
+        const b = buckets[i];
+        const total = b.added + b.updated + b.removed;
+        if (total === 0) continue;
 
-    let expirations = cookies;
-    expirations = expirations.map(calculateOne, thisArg);
-    expirations = expirations.filter((value, index, arr) => {
-        // Remove session cookies (0's)
-        if (value) return true;
-    })
-    expirations = expirations.sort((a, b) => a - b);
+        // Draw segments from bottom up: removed, updated, added.
+        let yBase = H;
+        for (const [field, color] of [
+            ['removed', COLORS.removed],
+            ['updated', COLORS.updated],
+            ['added',   COLORS.added],
+        ]) {
+            const segH = (b[field] / maxTotal) * H;
+            if (segH < 0.5) continue;
+            ctx.fillStyle = color;
+            ctx.fillRect(
+                Math.round(x),
+                Math.round(yBase - segH),
+                Math.ceil(bw),
+                Math.ceil(segH),
+            );
+            yBase -= segH;
+        }
+    }
 
-    console.log(expirations);
-};
-
-const printSorted = async () => {
-    let cookies = await chrome.cookies.getAll({});
-
-    let sorted = cookies;
-    sorted = sorted.filter((value, index, arr) => {
-        return value.session === false;
-    });
-    sorted = sorted.sort((a, b) => a.expirationDate - b.expirationDate);
-
-    console.log(sorted);
-};
-
-document.getElementById('calculateTimebuckets').addEventListener('click', printSorted);
+    // "Now" marker — subtle vertical line at the right edge.
+    ctx.strokeStyle = '#3a3a60';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(W - 1, 0);
+    ctx.lineTo(W - 1, H);
+    ctx.stroke();
 
 
-// document.getElementById('getAll').addEventListener('click', clickGetAll);
+}
 
-// // The async IIFE is necessary because Chrome <89 does not support top level await.
-// (async function initPopupWindow() {
+// --------------------------------------------------------------------------
+// Storage
+// --------------------------------------------------------------------------
 
-//     // How many cookies are non-session (disk-stored) with an expiration date?
+function applyStats(newStats) {
+    for (const key of Object.keys(target)) {
+        if (newStats[key] !== undefined) {
+            target[key] = newStats[key];
+        }
+    }
+}
 
-//     let all = await chrome.cookies.getAll({});
-//     let stored = all.filter(cookie => cookie.session === false);
-// })();
-
-// async function deleteDomainCookies(domain) {
-//     let cookiesDeleted = 0;
-//     try {
-//         const cookies = await chrome.cookies.getAll({ domain });
-
-//         if (cookies.length === 0) {
-//             return 'No cookies found';
-//         }
-
-//         let pending = cookies.map(deleteCookie);
-//         await Promise.all(pending);
-
-//         cookiesDeleted = pending.length;
-//     } catch (error) {
-//         return `Unexpected error: ${error.message}`;
-//     }
-
-//     return `Deleted ${cookiesDeleted} cookie(s).`;
-// }
-
-chrome.storage.local.get('stats', (result) => {
+// Initial load: set displayed and target to the same values (no animation).
+chrome.storage.local.get(['stats', 'chartData'], (result) => {
     if (result.stats) {
-        currentStats = result.stats;
-        newStats = result.stats;
-        document.getElementById('stats-active').textContent  = result.stats.active;
-        document.getElementById('stats-added').textContent   = result.stats.added;
-        document.getElementById('stats-updated').textContent = result.stats.updated;
-        document.getElementById('stats-removed').textContent = result.stats.removed;
-        document.getElementById('stats-expired').textContent = result.stats.expired;
+        applyStats(result.stats);
+        Object.assign(displayed, target);
+        updateDOM();
+    }
+    if (result.chartData) {
+        chartData = result.chartData;
     }
 });
 
-chrome.storage.onChanged.addListener((changes, namespace) => {
-    for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
-        console.log(
-            `Storage key "${key}" in namespace "${namespace}" changed.`,
-            `Old value was "${oldValue}", new value is "${newValue}".`
-        );
-
-        if (key === 'stats') {
-            // const stats = newValue;
-            // console.log(newValue);
-
-            // Update the various observers.
-            window.dispatchEvent(new CustomEvent('statsUpdateEvent', {
-                detail: {
-                    stats: newValue
-                }
-            }));
-        }
-    }
+// Subsequent updates: animate counters, update chart data.
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.stats)     applyStats(changes.stats.newValue ?? {});
+    if (changes.chartData) chartData = changes.chartData.newValue ?? {};
 });
+
+// --------------------------------------------------------------------------
+// Canvas resize
+// --------------------------------------------------------------------------
+
+const dpr = window.devicePixelRatio || 1;
+
+function resizeCanvas() {
+    const cssW = canvas.offsetWidth;
+    const cssH = canvas.offsetHeight;
+    canvasW = Math.round(cssW * dpr);
+    canvasH = Math.round(cssH * dpr);
+    canvas.width  = canvasW;
+    canvas.height = canvasH;
+}
+
+new ResizeObserver(resizeCanvas).observe(canvas);
+
+// --------------------------------------------------------------------------
+// Animation loop
+// --------------------------------------------------------------------------
+
+function rafLoop() {
+    if (stepCounters()) updateDOM();
+    drawChart();
+    requestAnimationFrame(rafLoop);
+}
+
+requestAnimationFrame(rafLoop);
