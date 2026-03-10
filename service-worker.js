@@ -66,10 +66,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // --------------------------------------------------------------------------
 
 async function enforceMaxAge(cookie) {
-    if (!cookie.expirationDate) return; // session cookie — no expiry to limit
-
     const maxExpirySec = Date.now() / 1000 + maxAgeDays * 86400;
-    if (cookie.expirationDate <= maxExpirySec) return; // already within limit
+    if (cookie.expirationDate && cookie.expirationDate <= maxExpirySec) return; // already within limit
 
     const protocol = cookie.secure ? 'https:' : 'http:';
     const host     = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
