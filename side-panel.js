@@ -232,7 +232,7 @@ function renderCookies(cookies) {
         }
     }
 
-    const html = GROUPS.map(g => {
+    let html = GROUPS.map(g => {
         const items = buckets[g.id];
         if (items.length === 0) return '';
 
@@ -258,6 +258,47 @@ function renderCookies(cookies) {
             (open ? `<ul class="group-items">${rows}</ul>` : '') +
             `</div>`;
     }).join('');
+
+    // Unmodified domains: cookies from domains with no recorded activity.
+    const unmodifiedCookies = cookies.filter(c => !domainLastModified[c.domain]);
+    if (unmodifiedCookies.length > 0) {
+        // Group by domain, sort domains alphabetically.
+        const byDomain = {};
+        for (const c of unmodifiedCookies) {
+            (byDomain[c.domain] = byDomain[c.domain] ?? []).push(c);
+        }
+        const domains = Object.keys(byDomain).sort();
+
+        const outerOpen = !collapsedGroups.has('unmodified');
+
+        const subgroupsHtml = domains.map(domain => {
+            const items = byDomain[domain].sort((a, b) => a.name.localeCompare(b.name));
+            const domId  = 'unmod-' + domain;
+            const domOpen = !collapsedGroups.has(domId);
+            const rows = items.map(c =>
+                `<li class="cookie-item subitem">` +
+                `<span class="cookie-name">${escapeHTML(c.name || '(no name)')}</span>` +
+                `</li>`
+            ).join('');
+            return `<div class="group domain-subgroup" data-id="${escapeHTML(domId)}">` +
+                `<button class="group-header" aria-expanded="${domOpen}">` +
+                    `<span class="group-toggle">${domOpen ? '▾' : '▸'}</span>` +
+                    `<span class="group-label">${escapeHTML(domain)}</span>` +
+                    `<span class="group-count">${items.length}</span>` +
+                `</button>` +
+                (domOpen ? `<ul class="group-items">${rows}</ul>` : '') +
+                `</div>`;
+        }).join('');
+
+        html += `<div class="group" data-id="unmodified">` +
+            `<button class="group-header" aria-expanded="${outerOpen}">` +
+                `<span class="group-toggle">${outerOpen ? '▾' : '▸'}</span>` +
+                `<span class="group-label">Unmodified Domains</span>` +
+                `<span class="group-count">${domains.length}</span>` +
+            `</button>` +
+            (outerOpen ? `<div class="domain-subgroups">${subgroupsHtml}</div>` : '') +
+            `</div>`;
+    }
 
     cookieListEl.innerHTML = html;
 

@@ -222,6 +222,17 @@ canvas {
     list-style: none;
 }
 
+/* Nested domain sub-groups inside Unmodified Domains */
+.domain-subgroup .group-header {
+    padding-left: 22px;
+    background: var(--bg);
+    font-size: 9.5px;
+}
+
+.cookie-item.subitem {
+    padding-left: 32px;
+}
+
 .cookie-item {
     display: flex;
     gap: 8px;
