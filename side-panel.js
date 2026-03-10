@@ -153,6 +153,110 @@ function drawChart() {
 }
 
 // --------------------------------------------------------------------------
+// Cookie list
+// --------------------------------------------------------------------------
+
+const cookieListEl = document.getElementById('cookie-list');
+
+const GROUPS = [
+    { id: 'week',    label: 'Less than 1 week',   minDays: 0,  maxDays: 7        },
+    { id: 'month',   label: '1 week – 1 month',   minDays: 7,  maxDays: 30       },
+    { id: '2mo',     label: '1 – 2 months',        minDays: 30, maxDays: 60       },
+    { id: '3mo',     label: '2 – 3 months',        minDays: 60, maxDays: 90       },
+    { id: 'rest',    label: 'More than 3 months',  minDays: 90, maxDays: Infinity },
+    { id: 'session', label: 'Session',             session: true                  },
+];
+
+// Tracks which groups the user has collapsed.
+const collapsedGroups = new Set();
+
+// Last fetched cookie list, cached so toggling groups doesn't re-fetch.
+let lastCookies = [];
+
+function escapeHTML(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function renderCookies(cookies) {
+    const nowSec = Date.now() / 1000;
+
+    // Bucket cookies into groups.
+    const buckets = Object.fromEntries(GROUPS.map(g => [g.id, []]));
+
+    for (const c of cookies) {
+        if (!c.expirationDate) {
+            buckets['session'].push(c);
+            continue;
+        }
+        const days = (c.expirationDate - nowSec) / 86400;
+        for (const g of GROUPS) {
+            if (g.session) continue;
+            if (days >= g.minDays && days < g.maxDays) {
+                buckets[g.id].push(c);
+                break;
+            }
+        }
+    }
+
+    // Sort: expiring groups by soonest first; session by domain then name.
+    for (const g of GROUPS) {
+        if (g.session) {
+            buckets[g.id].sort((a, b) =>
+                a.domain.localeCompare(b.domain) || a.name.localeCompare(b.name));
+        } else {
+            buckets[g.id].sort((a, b) => (a.expirationDate ?? 0) - (b.expirationDate ?? 0));
+        }
+    }
+
+    const html = GROUPS.map(g => {
+        const items = buckets[g.id];
+        if (items.length === 0) return '';
+
+        const open = !collapsedGroups.has(g.id);
+        const rows = items.map(c => {
+            const name   = escapeHTML(c.name   || '(no name)');
+            const domain = escapeHTML(c.domain || '');
+            return `<li class="cookie-item">` +
+                   `<span class="cookie-name">${name}</span>` +
+                   `<span class="cookie-domain">${domain}</span>` +
+                   `</li>`;
+        }).join('');
+
+        return `<div class="group" data-id="${g.id}">` +
+            `<button class="group-header" aria-expanded="${open}">` +
+                `<span class="group-toggle">${open ? '▾' : '▸'}</span>` +
+                `<span class="group-label">${escapeHTML(g.label)}</span>` +
+                `<span class="group-count">${items.length}</span>` +
+            `</button>` +
+            (open ? `<ul class="group-items">${rows}</ul>` : '') +
+            `</div>`;
+    }).join('');
+
+    cookieListEl.innerHTML = html;
+
+    for (const btn of cookieListEl.querySelectorAll('.group-header')) {
+        btn.addEventListener('click', () => {
+            const id = btn.closest('.group').dataset.id;
+            if (collapsedGroups.has(id)) {
+                collapsedGroups.delete(id);
+            } else {
+                collapsedGroups.add(id);
+            }
+            renderCookies(lastCookies);
+        });
+    }
+}
+
+async function loadCookies() {
+    lastCookies = await chrome.cookies.getAll({});
+    renderCookies(lastCookies);
+}
+
+// --------------------------------------------------------------------------
 // Storage
 // --------------------------------------------------------------------------
 
@@ -174,13 +278,15 @@ chrome.storage.local.get(['stats', 'chartData'], (result) => {
     if (result.chartData) {
         chartData = result.chartData;
     }
+    loadCookies();
 });
 
-// Subsequent updates: animate counters, update chart data.
+// Subsequent updates: animate counters, update chart data, refresh cookie list.
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes.stats)     applyStats(changes.stats.newValue ?? {});
     if (changes.chartData) chartData = changes.chartData.newValue ?? {};
+    if (changes.stats || changes.chartData) loadCookies();
 });
 
 // --------------------------------------------------------------------------
