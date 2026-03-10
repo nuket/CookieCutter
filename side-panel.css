@@ -129,6 +129,47 @@ canvas {
     background: var(--bg);
 }
 
+/* Max age control */
+
+.max-age-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.max-age-control label {
+    flex: 1;
+    font-size: 11px;
+    color: var(--dim);
+    cursor: default;
+}
+
+.max-age-control input[type="number"] {
+    width: 58px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    padding: 2px 6px;
+    text-align: right;
+}
+
+.max-age-control input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.max-age-unit {
+    font-size: 11px;
+    color: var(--dim);
+}
+
 /* Legend */
 
 .legend {

@@ -389,6 +389,22 @@ document.getElementById('collapse-all').addEventListener('click', () => {
 });
 
 // --------------------------------------------------------------------------
+// Max age control
+// --------------------------------------------------------------------------
+
+const maxAgeInput = document.getElementById('max-age');
+
+chrome.storage.local.get(['maxAgeDays'], (result) => {
+    if (result.maxAgeDays !== undefined) maxAgeInput.value = result.maxAgeDays;
+});
+
+maxAgeInput.addEventListener('change', () => {
+    const val = Math.max(1, parseInt(maxAgeInput.value, 10) || 14);
+    maxAgeInput.value = val;
+    chrome.storage.local.set({ maxAgeDays: val });
+});
+
+// --------------------------------------------------------------------------
 // Storage
 // --------------------------------------------------------------------------
 
