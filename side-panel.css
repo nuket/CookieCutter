@@ -160,6 +160,35 @@ canvas {
 .legend-item.updated::before { background: var(--blue); }
 .legend-item.removed::before { background: var(--red); }
 
+/* List controls */
+
+.list-controls {
+    display: flex;
+    gap: 6px;
+    padding: 6px 10px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.list-controls button {
+    flex: 1;
+    padding: 4px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--dim);
+    font-family: inherit;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+}
+
+.list-controls button:hover {
+    color: var(--text);
+    border-color: var(--dim);
+}
+
 /* Cookie list */
 
 #cookie-list {

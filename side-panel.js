@@ -320,6 +320,18 @@ async function loadCookies() {
     renderCookies(lastCookies);
 }
 
+document.getElementById('expand-all').addEventListener('click', () => {
+    collapsedGroups.clear();
+    renderCookies(lastCookies);
+});
+
+document.getElementById('collapse-all').addEventListener('click', () => {
+    for (const el of cookieListEl.querySelectorAll('.group[data-id]')) {
+        collapsedGroups.add(el.dataset.id);
+    }
+    renderCookies(lastCookies);
+});
+
 // --------------------------------------------------------------------------
 // Storage
 // --------------------------------------------------------------------------
