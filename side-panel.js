@@ -202,7 +202,19 @@ const calculateAll = async () => {
     console.log(expirations);
 };
 
-document.getElementById('calculateTimebuckets').addEventListener('click', calculateAll);
+const printSorted = async () => {
+    let cookies = await chrome.cookies.getAll({});
+
+    let sorted = cookies;
+    sorted = sorted.filter((value, index, arr) => {
+        return value.session === false;
+    });
+    sorted = sorted.sort((a, b) => a.expirationDate - b.expirationDate);
+
+    console.log(sorted);
+};
+
+document.getElementById('calculateTimebuckets').addEventListener('click', printSorted);
 
 
 // document.getElementById('getAll').addEventListener('click', clickGetAll);
@@ -235,6 +247,18 @@ document.getElementById('calculateTimebuckets').addEventListener('click', calcul
 
 //     return `Deleted ${cookiesDeleted} cookie(s).`;
 // }
+
+chrome.storage.local.get('stats', (result) => {
+    if (result.stats) {
+        currentStats = result.stats;
+        newStats = result.stats;
+        document.getElementById('stats-active').textContent  = result.stats.active;
+        document.getElementById('stats-added').textContent   = result.stats.added;
+        document.getElementById('stats-updated').textContent = result.stats.updated;
+        document.getElementById('stats-removed').textContent = result.stats.removed;
+        document.getElementById('stats-expired').textContent = result.stats.expired;
+    }
+});
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
     for (let [key, { oldValue, newValue }] of Object.entries(changes)) {

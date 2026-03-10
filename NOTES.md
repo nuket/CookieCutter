@@ -19,6 +19,11 @@ A Chrome extension that lets you visualize Cookie accesses while you're browsing
     </script>
 ```
 
+```
+    "notifications",
+    "tabs",
+```
+
 ## 27 JULY 2025
 
 Interesting.
