@@ -17,6 +17,9 @@ let stats = { active: 0, added: 0, updated: 0, removed: 0, expired: 0 };
 // Keyed by Unix second string for easy serialization and gap detection.
 let chartData = {};
 
+// domainLastModified: { [domain]: timestampMs }
+let domainLastModified = {};
+
 // Pending overwrite map: tracks "overwrite+removed" events waiting for
 // the matching "explicit+added" event. key = name + "||" + domain, value = timestamp.
 const pendingOverwrites = new Map();
@@ -34,14 +37,15 @@ async function init() {
     if (initialized) return;
     initialized = true;
 
-    const stored = await chrome.storage.local.get(['stats', 'chartData']);
-    if (stored.stats)     Object.assign(stats, stored.stats);
-    if (stored.chartData) chartData = stored.chartData;
+    const stored = await chrome.storage.local.get(['stats', 'chartData', 'domainLastModified']);
+    if (stored.stats)               Object.assign(stats, stored.stats);
+    if (stored.chartData)           chartData = stored.chartData;
+    if (stored.domainLastModified)  domainLastModified = stored.domainLastModified;
 
     // Recount active cookies to correct any drift.
     const all = await chrome.cookies.getAll({});
     stats.active = all.length;
-    await chrome.storage.local.set({ stats, chartData });
+    await chrome.storage.local.set({ stats, chartData, domainLastModified });
     console.log('Initialized:', stats);
 }
 
@@ -90,7 +94,14 @@ async function flush() {
     pruneChartData();
     const all = await chrome.cookies.getAll({});
     stats.active = all.length;
-    await chrome.storage.local.set({ stats, chartData });
+
+    // Prune domains that no longer have any active cookies.
+    const activeDomains = new Set(all.map(c => c.domain));
+    for (const domain of Object.keys(domainLastModified)) {
+        if (!activeDomains.has(domain)) delete domainLastModified[domain];
+    }
+
+    await chrome.storage.local.set({ stats, chartData, domainLastModified });
     console.log(stats);
 }
 
@@ -126,19 +137,23 @@ chrome.cookies.onChanged.addListener((details) => {
             stats.added++;
             bucket.added++;
         }
+        domainLastModified[cookie.domain] = now;
     }
     else if (cause === 'explicit' && removed === true) {
         stats.removed++;
         bucket.removed++;
+        domainLastModified[cookie.domain] = now;
     }
     else if (cause === 'expired' || cause === 'expired_overwrite') {
         stats.removed++;
         stats.expired++;
         bucket.removed++;
+        domainLastModified[cookie.domain] = now;
     }
     else if (cause === 'evicted') {
         stats.removed++;
         bucket.removed++;
+        domainLastModified[cookie.domain] = now;
     }
     else {
         console.log('Unhandled cookie change:', details);

@@ -235,12 +235,22 @@ canvas {
 
 .cookie-domain {
     flex-shrink: 0;
-    max-width: 45%;
+    max-width: 38%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--dim);
     font-size: 11px;
+}
+
+.cookie-time {
+    flex-shrink: 0;
+    width: 52px;
+    text-align: right;
+    color: var(--dim);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
 }
 
 /* Footer */

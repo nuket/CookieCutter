@@ -175,6 +175,18 @@ const GROUPS = [
     { id: 'session', label: 'Session',             session: true                  },
 ];
 
+// domainLastModified: { [domain]: timestampMs }
+let domainLastModified = {};
+
+function timeAgo(ms) {
+    const diff = Date.now() - ms;
+    if (diff < 10000)    return 'just now';
+    if (diff < 60000)    return `${Math.floor(diff / 1000)}s ago`;
+    if (diff < 3600000)  return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return `${Math.floor(diff / 86400000)}d ago`;
+}
+
 // Tracks which groups the user has collapsed.
 const collapsedGroups = new Set();
 
@@ -228,9 +240,12 @@ function renderCookies(cookies) {
         const rows = items.map(c => {
             const name   = escapeHTML(c.name   || '(no name)');
             const domain = escapeHTML(c.domain || '');
+            const ts     = domainLastModified[c.domain];
+            const time   = ts ? timeAgo(ts) : '';
             return `<li class="cookie-item">` +
                    `<span class="cookie-name">${name}</span>` +
                    `<span class="cookie-domain">${domain}</span>` +
+                   `<span class="cookie-time" data-domain="${domain}">${time}</span>` +
                    `</li>`;
         }).join('');
 
@@ -277,23 +292,23 @@ function applyStats(newStats) {
 }
 
 // Initial load: set displayed and target to the same values (no animation).
-chrome.storage.local.get(['stats', 'chartData'], (result) => {
+chrome.storage.local.get(['stats', 'chartData', 'domainLastModified'], (result) => {
     if (result.stats) {
         applyStats(result.stats);
         Object.assign(displayed, target);
         updateDOM();
     }
-    if (result.chartData) {
-        chartData = result.chartData;
-    }
+    if (result.chartData)          chartData = result.chartData;
+    if (result.domainLastModified) domainLastModified = result.domainLastModified;
     loadCookies();
 });
 
 // Subsequent updates: animate counters, update chart data, refresh cookie list.
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    if (changes.stats)     applyStats(changes.stats.newValue ?? {});
-    if (changes.chartData) chartData = changes.chartData.newValue ?? {};
+    if (changes.stats)               applyStats(changes.stats.newValue ?? {});
+    if (changes.chartData)           chartData = changes.chartData.newValue ?? {};
+    if (changes.domainLastModified)  domainLastModified = changes.domainLastModified.newValue ?? {};
     if (changes.stats || changes.chartData) loadCookies();
 });
 
@@ -318,8 +333,21 @@ new ResizeObserver(resizeCanvas).observe(canvas);
 // Animation loop
 // --------------------------------------------------------------------------
 
+let lastTimeTick = 0;
+
+function tickTimeElements() {
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (nowSec === lastTimeTick) return;
+    lastTimeTick = nowSec;
+    for (const el of cookieListEl.querySelectorAll('.cookie-time[data-domain]')) {
+        const ts = domainLastModified[el.dataset.domain];
+        el.textContent = ts ? timeAgo(ts) : '';
+    }
+}
+
 function rafLoop() {
     if (stepCounters()) updateDOM();
+    tickTimeElements();
     drawChart();
     requestAnimationFrame(rafLoop);
 }
