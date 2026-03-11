@@ -201,10 +201,39 @@ function escapeHTML(str) {
         .replace(/"/g, '&quot;');
 }
 
+// Known two-part TLDs that need three labels to identify a registrable domain.
+const MULTI_PART_TLDS = new Set([
+    'co.uk','org.uk','me.uk','net.uk','ltd.uk','plc.uk',
+    'com.au','net.au','org.au','edu.au','gov.au','id.au',
+    'co.jp','ne.jp','or.jp','ac.jp','go.jp','ad.jp','ed.jp',
+    'co.nz','net.nz','org.nz','govt.nz','ac.nz',
+    'co.in','net.in','org.in','firm.in','gen.in',
+    'com.br','net.br','org.br','gov.br','edu.br',
+    'com.cn','net.cn','org.cn','gov.cn','edu.cn',
+    'co.za','org.za','net.za','gov.za','ac.za',
+    'com.mx','net.mx','org.mx','gob.mx','edu.mx',
+    'co.kr','or.kr','ne.kr','go.kr','ac.kr',
+    'co.il','net.il','org.il','ac.il','gov.il',
+    'com.ar','net.ar','org.ar','gov.ar','edu.ar',
+    'com.sg','net.sg','org.sg','gov.sg','edu.sg',
+    'com.hk','net.hk','org.hk','gov.hk','edu.hk',
+    'com.tw','net.tw','org.tw','gov.tw','edu.tw',
+    'co.id','net.id','or.id','ac.id','go.id',
+    'com.my','net.my','org.my','gov.my','edu.my',
+    'com.ph','net.ph','org.ph','gov.ph','edu.ph',
+    'com.pk','net.pk','org.pk','gov.pk','edu.pk',
+    'com.tr','net.tr','org.tr','gov.tr','edu.tr',
+    'co.ke','or.ke','ne.ke','go.ke','ac.ke',
+    'com.ng','net.ng','org.ng','gov.ng','edu.ng',
+]);
+
 function rootDomain(domain) {
     const d = domain.startsWith('.') ? domain.slice(1) : domain;
     const parts = d.split('.');
-    return parts.length > 2 ? parts.slice(-2).join('.') : d;
+    if (parts.length <= 2) return d;
+    const lastTwo = parts.slice(-2).join('.');
+    const take = MULTI_PART_TLDS.has(lastTwo) ? 3 : 2;
+    return parts.slice(-take).join('.');
 }
 
 async function removeCookies(cookies) {
