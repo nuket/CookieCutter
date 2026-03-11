@@ -391,8 +391,13 @@ function renderCookies(cookies) {
     }
 
     for (const btn of cookieListEl.querySelectorAll('.domain-delete-btn')) {
-        btn.addEventListener('click', async () => {
-            await deleteDomainCookies(btn.dataset.domain);
+        btn.addEventListener('click', () => {
+            const subgroup = btn.closest('.domain-subgroup');
+            subgroup.classList.add('deleting');
+            subgroup.addEventListener('transitionend', (e) => {
+                if (e.propertyName !== 'opacity') return;
+                deleteDomainCookies(btn.dataset.domain);
+            });
         });
     }
 }

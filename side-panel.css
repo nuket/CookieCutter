@@ -316,6 +316,16 @@ canvas {
 }
 
 /* Nested domain sub-groups inside Unmodified Domains */
+.domain-subgroup {
+    transition: background-color 0.08s ease, opacity 0.4s ease 0.08s;
+}
+
+.domain-subgroup.deleting {
+    background-color: color-mix(in srgb, var(--red) 25%, var(--bg));
+    opacity: 0;
+    pointer-events: none;
+}
+
 .domain-subgroup .group-header {
     padding-left: 22px;
     background: var(--bg);
