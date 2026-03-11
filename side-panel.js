@@ -201,6 +201,23 @@ function escapeHTML(str) {
         .replace(/"/g, '&quot;');
 }
 
+async function deleteDomainCookies(domain) {
+    const cookies = lastCookies.filter(c => c.domain === domain);
+    for (const cookie of cookies) {
+        const protocol = cookie.secure ? 'https:' : 'http:';
+        const host = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
+        try {
+            await chrome.cookies.remove({
+                url:     `${protocol}//${host}${cookie.path}`,
+                name:    cookie.name,
+                storeId: cookie.storeId,
+            });
+        } catch (e) {
+            console.warn('deleteDomainCookies failed for', cookie.name, e);
+        }
+    }
+}
+
 function renderCookies(cookies) {
     const nowSec = Date.now() / 1000;
 
@@ -267,12 +284,15 @@ function renderCookies(cookies) {
                     `</li>`
                 ).join('');
                 return `<div class="group domain-subgroup" data-id="${escapeHTML(domId)}">` +
-                    `<button class="group-header" aria-expanded="${domOpen}">` +
-                        `<span class="group-toggle">${domOpen ? '▾' : '▸'}</span>` +
-                        `<span class="group-label">${escapeHTML(domain)}</span>` +
-                        `<span class="group-time" data-domain="${escapeHTML(domain)}">${timeAgo(ts)}</span>` +
-                        `<span class="group-count">${items.length}</span>` +
-                    `</button>` +
+                    `<div class="domain-header-row">` +
+                        `<button class="group-header" aria-expanded="${domOpen}">` +
+                            `<span class="group-toggle">${domOpen ? '▾' : '▸'}</span>` +
+                            `<span class="group-label">${escapeHTML(domain)}</span>` +
+                            `<span class="group-time" data-domain="${escapeHTML(domain)}">${timeAgo(ts)}</span>` +
+                            `<span class="group-count">${items.length}</span>` +
+                        `</button>` +
+                        `<button class="domain-delete-btn" data-domain="${escapeHTML(domain)}" title="Delete all cookies for ${escapeHTML(domain)}">✕</button>` +
+                    `</div>` +
                     (domOpen ? `<ul class="group-items">${rows}</ul>` : '') +
                     `</div>`;
             }).join('');
@@ -367,6 +387,12 @@ function renderCookies(cookies) {
                 collapsedGroups.add(id);
             }
             renderCookies(lastCookies);
+        });
+    }
+
+    for (const btn of cookieListEl.querySelectorAll('.domain-delete-btn')) {
+        btn.addEventListener('click', async () => {
+            await deleteDomainCookies(btn.dataset.domain);
         });
     }
 }
@@ -493,7 +519,7 @@ function tickTimeElements() {
     const nowSec = Math.floor(Date.now() / 1000);
     if (nowSec === lastTimeTick) return;
     lastTimeTick = nowSec;
-    for (const el of cookieListEl.querySelectorAll('[data-domain]')) {
+    for (const el of cookieListEl.querySelectorAll('.group-time[data-domain]')) {
         const ts = domainLastModified[el.dataset.domain];
         el.textContent = ts ? timeAgo(ts) : '';
     }

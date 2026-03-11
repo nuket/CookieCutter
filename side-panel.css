@@ -322,6 +322,34 @@ canvas {
     font-size: 9.5px;
 }
 
+/* Domain header row: toggle button + delete button as siblings */
+.domain-header-row {
+    display: flex;
+    align-items: stretch;
+}
+
+.domain-header-row .group-header {
+    flex: 1;
+}
+
+.domain-delete-btn {
+    flex-shrink: 0;
+    padding: 0 10px;
+    background: var(--bg);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+    color: var(--dim);
+    font-size: 11px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.domain-delete-btn:hover {
+    color: var(--red);
+    background: color-mix(in srgb, var(--red) 10%, var(--bg));
+}
+
 .cookie-item.subitem {
     padding-left: 32px;
 }
