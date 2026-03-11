@@ -404,6 +404,35 @@ maxAgeInput.addEventListener('change', () => {
     chrome.storage.local.set({ maxAgeDays: val });
 });
 
+document.getElementById('apply-max-age').addEventListener('click', async () => {
+    const maxDays    = Math.max(1, parseInt(maxAgeInput.value, 10) || 14);
+    const maxExpiry  = Date.now() / 1000 + maxDays * 86400;
+    const cookies    = await chrome.cookies.getAll({});
+
+    for (const cookie of cookies) {
+        if (cookie.expirationDate && cookie.expirationDate <= maxExpiry) continue;
+
+        const protocol = cookie.secure ? 'https:' : 'http:';
+        const host     = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
+        try {
+            await chrome.cookies.set({
+                url:            `${protocol}//${host}${cookie.path}`,
+                name:           cookie.name,
+                value:          cookie.value,
+                domain:         cookie.hostOnly ? undefined : cookie.domain,
+                path:           cookie.path,
+                secure:         cookie.secure,
+                httpOnly:       cookie.httpOnly,
+                sameSite:       cookie.sameSite === 'unspecified' ? undefined : cookie.sameSite,
+                expirationDate: maxExpiry,
+                storeId:        cookie.storeId,
+            });
+        } catch (e) {
+            console.warn('apply-max-age failed for', cookie.name, e);
+        }
+    }
+});
+
 // --------------------------------------------------------------------------
 // Storage
 // --------------------------------------------------------------------------

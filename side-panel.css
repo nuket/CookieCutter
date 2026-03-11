@@ -170,6 +170,22 @@ canvas {
     color: var(--dim);
 }
 
+#apply-max-age {
+    padding: 3px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+#apply-max-age:hover {
+    border-color: var(--accent);
+}
+
 /* Legend */
 
 .legend {
