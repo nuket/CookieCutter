@@ -201,8 +201,13 @@ function escapeHTML(str) {
         .replace(/"/g, '&quot;');
 }
 
-async function deleteDomainCookies(domain) {
-    const cookies = lastCookies.filter(c => c.domain === domain);
+function rootDomain(domain) {
+    const d = domain.startsWith('.') ? domain.slice(1) : domain;
+    const parts = d.split('.');
+    return parts.length > 2 ? parts.slice(-2).join('.') : d;
+}
+
+async function removeCookies(cookies) {
     for (const cookie of cookies) {
         const protocol = cookie.secure ? 'https:' : 'http:';
         const host = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
@@ -213,9 +218,17 @@ async function deleteDomainCookies(domain) {
                 storeId: cookie.storeId,
             });
         } catch (e) {
-            console.warn('deleteDomainCookies failed for', cookie.name, e);
+            console.warn('removeCookies failed for', cookie.name, e);
         }
     }
+}
+
+async function deleteDomainCookies(domain) {
+    await removeCookies(lastCookies.filter(c => c.domain === domain));
+}
+
+async function deleteRootDomainCookies(root) {
+    await removeCookies(lastCookies.filter(c => rootDomain(c.domain) === root));
 }
 
 function renderCookies(cookies) {
@@ -376,6 +389,51 @@ function renderCookies(cookies) {
             `</div>`;
     }
 
+    // By Domain: all cookies grouped by root domain (last two labels).
+    const byRootMap = {};
+    for (const c of cookies) {
+        const root = rootDomain(c.domain);
+        (byRootMap[root] = byRootMap[root] ?? []).push(c);
+    }
+    const rootDomains = Object.keys(byRootMap).sort();
+
+    if (rootDomains.length > 0) {
+        const outerOpen = !collapsedGroups.has('byDomain');
+
+        const subgroupsHtml = rootDomains.map(root => {
+            const items = byRootMap[root].sort((a, b) =>
+                a.domain.localeCompare(b.domain) || a.name.localeCompare(b.name));
+            const domId   = 'bydomain-' + root;
+            const domOpen = !collapsedGroups.has(domId);
+            const rows = items.map(c =>
+                `<li class="cookie-item subitem">` +
+                `<span class="cookie-name">${escapeHTML(c.name || '(no name)')}</span>` +
+                `<span class="cookie-domain">${escapeHTML(c.domain)}</span>` +
+                `</li>`
+            ).join('');
+            return `<div class="group domain-subgroup" data-id="${escapeHTML(domId)}">` +
+                `<div class="domain-header-row">` +
+                    `<button class="group-header" aria-expanded="${domOpen}">` +
+                        `<span class="group-toggle">${domOpen ? '▾' : '▸'}</span>` +
+                        `<span class="group-label">${escapeHTML(root)}</span>` +
+                        `<span class="group-count">${items.length}</span>` +
+                    `</button>` +
+                    `<button class="domain-delete-btn" data-root-domain="${escapeHTML(root)}" title="Delete all cookies for ${escapeHTML(root)}">✕</button>` +
+                `</div>` +
+                (domOpen ? `<ul class="group-items">${rows}</ul>` : '') +
+                `</div>`;
+        }).join('');
+
+        html += `<div class="group" data-id="byDomain">` +
+            `<button class="group-header" aria-expanded="${outerOpen}">` +
+                `<span class="group-toggle">${outerOpen ? '▾' : '▸'}</span>` +
+                `<span class="group-label">By Domain</span>` +
+                `<span class="group-count">${rootDomains.length}</span>` +
+            `</button>` +
+            (outerOpen ? `<div class="domain-subgroups">${subgroupsHtml}</div>` : '') +
+            `</div>`;
+    }
+
     cookieListEl.innerHTML = recentHtml + html;
 
     for (const btn of cookieListEl.querySelectorAll('.group-header')) {
@@ -396,7 +454,11 @@ function renderCookies(cookies) {
             subgroup.classList.add('deleting');
             subgroup.addEventListener('transitionend', (e) => {
                 if (e.propertyName !== 'opacity') return;
-                deleteDomainCookies(btn.dataset.domain);
+                if (btn.dataset.rootDomain !== undefined) {
+                    deleteRootDomainCookies(btn.dataset.rootDomain);
+                } else {
+                    deleteDomainCookies(btn.dataset.domain);
+                }
             });
         });
     }
