@@ -16,6 +16,10 @@ to expire after 2 weeks, for example.
 
 ![Extension UI](ui.png)
 
+You can see the max-age enforcement in the service worker console log.
+
+![Service Worker Console Log](ui-console.png)
+
 ## Installation
 
 Cookie Cutter is not published to the Chrome Web Store, so it must be loaded as an unpacked extension:
